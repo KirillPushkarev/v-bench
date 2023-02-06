@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 	"v-bench/common"
 	"v-bench/virtual_cluster"
@@ -104,6 +105,7 @@ func runExperiment(benchmarkConfig common.TestConfig, vclusterManager virtual_cl
 
 	createInitialResources(benchmarkConfig)
 	runTests(benchmarkConfig)
+
 	cleanupInitialResources(benchmarkConfig)
 
 	if benchmarkConfig.ClusterType == "virtual" {
@@ -112,7 +114,35 @@ func runExperiment(benchmarkConfig common.TestConfig, vclusterManager virtual_cl
 }
 
 func createInitialResources(benchmarkConfig common.TestConfig) {
+	if benchmarkConfig.InitialResources.ConfigMap == 0 {
+		return
+	}
 
+	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
+		kubeconfigPath := filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)
+		createNsCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespaces", "initial")
+		stdout, err := createNsCmd.Output()
+
+		if err != nil {
+			fmt.Println(err.Error())
+			panic(err)
+		}
+		fmt.Println(string(stdout))
+
+		for i := 0; i < benchmarkConfig.InitialResources.ConfigMap; i++ {
+			createConfigMapCmdShellCommand := fmt.Sprintf("sed \"s/{{configmap-name}}/configmap-%v/g\" ../../k8s-specs/prepopulate/configmap-1m.yaml | kubectl --kubeconfig=%v create -f -;", i, kubeconfigPath)
+			createConfigMapCmd := exec.Command("bash", "-c", createConfigMapCmdShellCommand)
+			stdout, err := createConfigMapCmd.Output()
+
+			if err != nil {
+				fmt.Println(err.Error())
+				panic(err)
+			}
+			fmt.Println(string(stdout))
+		}
+	}
+
+	fmt.Println("Created initial resources in all clusters.")
 }
 
 func runTests(benchmarkConfig common.TestConfig) {
@@ -130,30 +160,38 @@ func runTests(benchmarkConfig common.TestConfig) {
 	fmt.Printf("Created directory for test run: %v.\n", testOutputPath)
 	fmt.Printf("Running test for all clusters in parallel...\n")
 
+	var wg sync.WaitGroup
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		if err := os.MkdirAll(filepath.Join(testOutputPath, clusterConfig.Name), os.ModePerm); err != nil {
-			log.Fatal(err)
-		}
+		clusterConfig := clusterConfig
+		wg.Add(1)
 
-		// TODO: переделать на Wait или горутины, разобраться с передачей env и перенаправлением stdout. Блокирующий вариант: Output() или Run(), неблокирующий вариант: Start() + Wait().
-		createCmd := exec.Command("kbench", "-benchconfig", fmt.Sprintf("../../k-bench-test-configs/%v", benchmarkConfig.TestConfigName), "-outdir", filepath.Join(testOutputPath, clusterConfig.Name))
-		createCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)))
-		outfile, err := os.Create(filepath.Join(testOutputPath, clusterConfig.Name, stdoutFileName))
-		if err != nil {
-			panic(err)
-		}
-		createCmd.Stdout = outfile
+		go func() {
+			if err := os.MkdirAll(filepath.Join(testOutputPath, clusterConfig.Name), os.ModePerm); err != nil {
+				log.Fatal(err)
+			}
 
-		err = createCmd.Run()
-		if err != nil {
-			panic(err)
-		}
+			// TODO: переделать на Wait или горутины, разобраться с передачей env и перенаправлением stdout. Блокирующий вариант: Output() или Run(), неблокирующий вариант: Start() + Wait().
+			cmd := exec.Command("kbench", "-benchconfig", fmt.Sprintf("../../k-bench-test-configs/%v", benchmarkConfig.TestConfigName), "-outdir", filepath.Join(testOutputPath, clusterConfig.Name))
+			cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)))
+			outfile, err := os.Create(filepath.Join(testOutputPath, clusterConfig.Name, stdoutFileName))
+			if err != nil {
+				panic(err)
+			}
+			cmd.Stdout = outfile
 
-		err = outfile.Close()
-		if err != nil {
-			panic(err)
-		}
+			err = cmd.Run()
+			if err != nil {
+				panic(err)
+			}
+
+			err = outfile.Close()
+			if err != nil {
+				panic(err)
+			}
+		}()
 	}
+
+	wg.Wait()
 
 	fmt.Println("Finished running tests.")
 }
@@ -207,5 +245,20 @@ func copyFile(src, dst string) (written int64, err error) {
 }
 
 func cleanupInitialResources(benchmarkConfig common.TestConfig) {
+	if benchmarkConfig.InitialResources.ConfigMap == 0 {
+		return
+	}
 
+	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
+		cmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)), "delete", "namespaces", "initial")
+		stdout, err := cmd.Output()
+
+		if err != nil {
+			fmt.Println(err.Error())
+			panic(err)
+		}
+		fmt.Println(string(stdout))
+	}
+
+	fmt.Println("Deleted initial resources from all clusters.")
 }

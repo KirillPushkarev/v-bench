@@ -35,8 +35,8 @@ func (StandardVirtualClusterManager) Create(benchmarkConfig common.TestConfig) {
 
 func (StandardVirtualClusterManager) Delete(benchmarkConfig common.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		createCmd := exec.Command("vcluster", "delete", clusterConfig.Name)
-		stdout, err := createCmd.Output()
+		cmd := exec.Command("vcluster", "delete", clusterConfig.Name)
+		stdout, err := cmd.Output()
 
 		if err != nil {
 			fmt.Println(err.Error())
