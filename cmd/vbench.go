@@ -149,7 +149,7 @@ func runTests(benchmarkConfig common.TestConfig) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	testOutputPath := filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName, benchmarkConfig.TestConfigName)
+	testOutputPath := filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName, benchmarkConfig.Name)
 	if err := os.MkdirAll(testOutputPath, os.ModePerm); err != nil {
 		log.Fatal(err)
 	}
