@@ -15,11 +15,12 @@ func NewStandardVirtualClusterManager() *StandardVirtualClusterManager {
 
 func (StandardVirtualClusterManager) Create(benchmarkConfig common.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		createCmd := exec.Command("vcluster", "create", clusterConfig.Name, "--connect=false", benchmarkConfig.ClusterCreateOptions)
-		stdout, err := createCmd.Output()
+		createCmdArgs := []string{"create", clusterConfig.Name, "--connect=false"}
+		createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
+		createCmd := exec.Command("vcluster", createCmdArgs...)
+		stdout, err := createCmd.CombinedOutput()
 		if err != nil {
 			fmt.Println(err.Error())
-			panic(err)
 		}
 		fmt.Println(string(stdout))
 
@@ -27,7 +28,6 @@ func (StandardVirtualClusterManager) Create(benchmarkConfig common.TestConfig) {
 		stdout, err = connectCmd.Output()
 		if err != nil {
 			fmt.Println(err.Error())
-			panic(err)
 		}
 		fmt.Println(string(stdout))
 	}
@@ -41,7 +41,6 @@ func (StandardVirtualClusterManager) Delete(benchmarkConfig common.TestConfig) {
 		stdout, err := cmd.Output()
 		if err != nil {
 			fmt.Println(err.Error())
-			panic(err)
 		}
 		fmt.Println(string(stdout))
 	}
