@@ -6,6 +6,8 @@ type ClusterConfig struct {
 }
 
 type TestConfig struct {
+	ConfigPath           string
+	Name                 string          `json:"name"`
 	ClusterType          string          `json:"cluster_type"`
 	KubeconfigBasePath   string          `json:"kubeconfig_base_path"`
 	RunsBasePath         string          `json:"runs_base_path"`

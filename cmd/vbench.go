@@ -81,7 +81,7 @@ func parseBenchmarkConfigs(benchmarkConfigPaths []string) []common.TestConfig {
 		}
 
 		decoder := json.NewDecoder(configFile)
-		testConfig := common.TestConfig{}
+		testConfig := common.TestConfig{ConfigPath: benchmarkConfigPath}
 		err = decoder.Decode(&testConfig)
 
 		if err != nil {
@@ -154,6 +154,10 @@ func runTests(benchmarkConfig common.TestConfig) {
 		log.Fatal(err)
 	}
 
+	_, err = copyFile(benchmarkConfig.ConfigPath, filepath.Join(testOutputPath, filepath.Base(benchmarkConfig.ConfigPath)))
+	if err != nil {
+		log.Fatal(err)
+	}
 	_, err = copyFile(benchmarkConfig.MetaInfoPath, filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName, metaInfoFileName))
 	if err != nil {
 		log.Fatal(err)
