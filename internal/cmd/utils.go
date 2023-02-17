@@ -1,9 +1,8 @@
-package main
+package cmd
 
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -12,30 +11,18 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"v-bench/common"
+	"v-bench/config"
+	"v-bench/measurement"
 	"v-bench/virtual_cluster"
 )
 
-const defaultConfigPath = "./config/default/config.json"
-const metaInfoFileName = "system_info.yaml"
-const stdoutFileName = "stdout.log"
-const maxExperimentsPerDay = 1000
+const (
+	metaInfoFileName     = "system_info.yaml"
+	stdoutFileName       = "stdout.log"
+	maxExperimentsPerDay = 1000
+)
 
-func main() {
-	benchmarkConfigPath := flag.String("config", defaultConfigPath, "benchmark config file")
-	flag.Parse()
-
-	benchmarkConfigPaths := readBenchmarkConfigPaths(benchmarkConfigPath)
-	benchmarkConfigs := parseBenchmarkConfigs(benchmarkConfigPaths)
-
-	vclusterManager := virtual_cluster.NewStandardVirtualClusterManager()
-
-	for _, benchmarkConfig := range benchmarkConfigs {
-		runExperiment(benchmarkConfig, vclusterManager)
-	}
-}
-
-func readBenchmarkConfigPaths(benchmarkConfigPath *string) []string {
+func ReadBenchmarkConfigPaths(benchmarkConfigPath *string) []string {
 	benchmarkConfigFileInfo, err := os.Stat(*benchmarkConfigPath)
 	if err != nil {
 		log.Fatal(err)
@@ -69,8 +56,8 @@ func readBenchmarkConfigPaths(benchmarkConfigPath *string) []string {
 	return benchmarkConfigs
 }
 
-func parseBenchmarkConfigs(benchmarkConfigPaths []string) []common.TestConfig {
-	var testConfigs []common.TestConfig
+func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
+	var testConfigs []config.TestConfig
 
 	for _, benchmarkConfigPath := range benchmarkConfigPaths {
 		configFile, err := os.OpenFile(benchmarkConfigPath, os.O_RDWR, 0666)
@@ -81,7 +68,7 @@ func parseBenchmarkConfigs(benchmarkConfigPaths []string) []common.TestConfig {
 		}
 
 		decoder := json.NewDecoder(configFile)
-		testConfig := common.TestConfig{ConfigPath: benchmarkConfigPath}
+		testConfig := config.TestConfig{ConfigPath: benchmarkConfigPath}
 		err = decoder.Decode(&testConfig)
 
 		if err != nil {
@@ -100,7 +87,7 @@ func parseBenchmarkConfigs(benchmarkConfigPaths []string) []common.TestConfig {
 	return testConfigs
 }
 
-func runExperiment(benchmarkConfig common.TestConfig, vclusterManager virtual_cluster.VirtualClusterManager) {
+func RunExperiment(benchmarkConfig config.TestConfig, vclusterManager virtual_cluster.VirtualClusterManager) {
 	if benchmarkConfig.ClusterType == "virtual" {
 		vclusterManager.Create(benchmarkConfig)
 	}
@@ -114,7 +101,7 @@ func runExperiment(benchmarkConfig common.TestConfig, vclusterManager virtual_cl
 	}
 }
 
-func createInitialResources(benchmarkConfig common.TestConfig) {
+func createInitialResources(benchmarkConfig config.TestConfig) {
 	if benchmarkConfig.InitialResources.ConfigMap == 0 {
 		return
 	}
@@ -144,7 +131,7 @@ func createInitialResources(benchmarkConfig common.TestConfig) {
 	fmt.Println("Created initial resources.")
 }
 
-func runTests(benchmarkConfig common.TestConfig) {
+func runTests(benchmarkConfig config.TestConfig) {
 	experimentDirName, err := getExperimentDirName(benchmarkConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -165,6 +152,10 @@ func runTests(benchmarkConfig common.TestConfig) {
 
 	fmt.Printf("Created directory for test run: %v.\n", testOutputPath)
 	fmt.Printf("Running test for all clusters in parallel...\n")
+
+	startTime := time.Now()
+	measurementContext := measurement.NewContext(startTime)
+	metricCollector := measurement.NewMetricCollector()
 
 	var wg sync.WaitGroup
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
@@ -200,10 +191,12 @@ func runTests(benchmarkConfig common.TestConfig) {
 
 	wg.Wait()
 
+	metricCollector.CollectMetrics(benchmarkConfig, measurementContext)
+
 	fmt.Println("Finished running tests.")
 }
 
-func getExperimentDirName(benchmarkConfig common.TestConfig) (string, error) {
+func getExperimentDirName(benchmarkConfig config.TestConfig) (string, error) {
 	i := 1
 	currentDate := time.Now().Format("2006_01_02")
 	experimentDirName := fmt.Sprintf("%v_%03d", currentDate, i)
@@ -257,7 +250,7 @@ func copyFile(sourcePath, destinationPath string) (bytesWritten int64, err error
 	return nBytes, err
 }
 
-func cleanupInitialResources(benchmarkConfig common.TestConfig) {
+func cleanupInitialResources(benchmarkConfig config.TestConfig) {
 	if benchmarkConfig.InitialResources.ConfigMap == 0 {
 		return
 	}

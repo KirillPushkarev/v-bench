@@ -1,0 +1,6 @@
+{
+  "root_kubeconfig_path": "C:/Users/Kirill/.kube/config",
+  "prometheus_options": {
+    "enabled": true
+  }
+}

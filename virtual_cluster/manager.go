@@ -1,8 +1,8 @@
 package virtual_cluster
 
-import "v-bench/common"
+import "v-bench/config"
 
 type VirtualClusterManager interface {
-	Create(benchmarkConfig common.TestConfig)
-	Delete(benchmarkConfig common.TestConfig)
+	Create(benchmarkConfig config.TestConfig)
+	Delete(benchmarkConfig config.TestConfig)
 }

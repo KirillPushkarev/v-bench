@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"v-bench/common"
+	"v-bench/config"
 )
 
 type StandardVirtualClusterManager struct{}
@@ -13,7 +13,7 @@ func NewStandardVirtualClusterManager() *StandardVirtualClusterManager {
 	return &StandardVirtualClusterManager{}
 }
 
-func (StandardVirtualClusterManager) Create(benchmarkConfig common.TestConfig) {
+func (StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		createCmdArgs := []string{"create", clusterConfig.Name, "--connect=false"}
 		createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
@@ -35,7 +35,7 @@ func (StandardVirtualClusterManager) Create(benchmarkConfig common.TestConfig) {
 	fmt.Println("Created virtual clusters.")
 }
 
-func (StandardVirtualClusterManager) Delete(benchmarkConfig common.TestConfig) {
+func (StandardVirtualClusterManager) Delete(benchmarkConfig config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		cmd := exec.Command("vcluster", "delete", clusterConfig.Name)
 		stdout, err := cmd.Output()
