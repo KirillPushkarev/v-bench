@@ -3,6 +3,7 @@ package measurement
 import (
 	"fmt"
 	"github.com/prometheus/common/model"
+	"math"
 	"strconv"
 	"time"
 	"v-bench/config"
@@ -14,15 +15,32 @@ import (
 const (
 	numK8sClients = 1
 
-	// apiCallLatencyQuery measures 99th percentile of API call latency over given period of time
-	// apiCallLatencyQuery: placeholders should be replaced with (1) quantile (2) apiCallLatencyFilters and (3) query window size.
-	apiCallLatencyQuery   = "histogram_quantile(%.2f, sum(rate(apiserver_request_duration_seconds_bucket{%v}[%v])) by (resource,  subresource, verb, scope, le))"
-	apiCallLatencyFilters = `verb!="WATCH", subresource!~"log|exec|portforward|attach|proxy"`
-	// TODO: Fix, calculating quantile over counter is meaningless
-	apiServerCpuQuery             = "quantile_over_time(%.2f, process_cpu_seconds_total{%v}[%v])"
-	apiServerMemoryQuery          = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
-	apiServerThreadQuery          = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
-	apiServerResourceUsageFilters = "job=\"apiserver\""
+	// apiServerLatencyQuery measures 99th percentile of API call latency over given period of time
+	// apiServerLatencyQuery: placeholders should be replaced with (1) quantile (2) apiServerCommonFilters and (3) query window size.
+	apiServerLatencyQuery           = "histogram_quantile(%.2f, sum(rate(apiserver_request_duration_seconds_bucket{%v}[%v])) by (resource,  subresource, verb, scope, le))"
+	apiServerCommonFilters          = `verb!="WATCH", subresource!~"log|exec|portforward|attach|proxy"`
+	apiServerCpuQuery               = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
+	apiServerCpuRateEvaluationRange = "1m"
+	apiServerCpuResolution          = "1m"
+	apiServerMemoryQuery            = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
+	apiServerThreadQuery            = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	apiServerResourceUsageFilters   = `job="apiserver"`
+
+	etcdLeaderElectionsQuery    = "increase(etcd_server_leader_changes_seen_total{%v}[%v])"
+	etcdDbSizeQuery             = "quantile_over_time(%.2f, etcd_mvcc_db_total_size_in_bytes{%v}[%v])"
+	etcdWalSyncQuery            = "histogram_quantile(%.2f, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{%v}[%v])) by (le))"
+	etcdBackendCommitSyncQuery  = "histogram_quantile(%.2f, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{%v}[%v])) by (le))"
+	etcdProposalsCommittedQuery = "sum(rate(etcd_server_proposals_committed_total{%v}[%v])"
+	etcdProposalsAppliedQuery   = "sum(rate(etcd_server_proposals_applied_total{%v}[%v])"
+	etcdProposalsPendingQuery   = "sum(quantile_over_time(0.5, etcd_server_proposals_pending{%v}[%v]))"
+	etcdProposalsFailedQuery    = "sum(rate(etcd_server_proposals_failed_total{%v}[%v])"
+	etcdCommonFilters           = `job="etcd"`
+	etcdCpuQuery                = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
+	etcdCpuRateEvaluationRange  = "1m"
+	etcdCpuResolution           = "1m"
+	etcdMemoryQuery             = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
+	etcdThreadQuery             = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	etcdResourceUsageFilters    = `job="etcd"`
 )
 
 var quantiles = []float64{0.5, 0.9, 0.99}
@@ -43,21 +61,21 @@ func (*MetricCollector) CollectMetrics(benchmarkConfig config.TestConfig, contex
 	pc = clients.NewInClusterPrometheusClient(prometheusFramework.GetClientSets().GetClient())
 	executor := NewPrometheusQueryExecutor(pc)
 	endTime := time.Now()
-	measurementDuration := endTime.Sub(context.StartTime)
-	promDuration := measurementutil.ToPrometheusTime(measurementDuration)
+	duration := endTime.Sub(context.StartTime)
+	durationInPromFormat := measurementutil.ToPrometheusTime(duration)
 
-	collectApiServerLatencyMetrics(context, executor, endTime, promDuration)
-	collectApiServerResourceMetrics(context, executor, endTime, promDuration)
-	//collectControllerManagerMetrics(promDuration, executor, endTime, err, context)
-	//collectSchedulerMetrics(promDuration, executor, endTime, err, context)
-	//collectEtcdMetrics(promDuration, executor, endTime, err, context)
-	//collectOverallControlPlaneMetrics(promDuration, executor, endTime, err, context)
+	collectApiServerLatencyMetrics(context, executor, endTime, durationInPromFormat)
+	collectApiServerResourceUsageMetrics(context, executor, endTime, durationInPromFormat)
+	//collectControllerManagerMetrics(durationInPromFormat, executor, endTime, err, context)
+	//collectSchedulerMetrics(durationInPromFormat, executor, endTime, err, context)
+	collectEtcdMetrics(context, executor, endTime, durationInPromFormat)
+	//collectOverallControlPlaneMetrics(durationInPromFormat, executor, endTime, err, context)
 }
 
 func collectApiServerLatencyMetrics(context *Context, executor *PrometheusQueryExecutor, endTime time.Time, durationInPromFormat string) {
 	var latencySamples []*model.Sample
 	for _, q := range quantiles {
-		query := fmt.Sprintf(apiCallLatencyQuery, q, apiCallLatencyFilters, durationInPromFormat)
+		query := fmt.Sprintf(apiServerLatencyQuery, q, apiServerCommonFilters, durationInPromFormat)
 		samples, err := executor.Query(query, endTime)
 		if err != nil {
 			fmt.Printf("prometheus query execution error: %v", err)
@@ -72,7 +90,7 @@ func collectApiServerLatencyMetrics(context *Context, executor *PrometheusQueryE
 	if err != nil {
 		fmt.Printf("prometheus metrics parsing error: %v", err)
 	}
-	context.SetApiCallMetrics(apiCallMetrics)
+	context.Metrics.ApiServerMetrics.ApiCallMetrics = *apiCallMetrics
 }
 
 func apiCallMetricsFromSamples(latencySamples []*model.Sample) (*ApiCallMetrics, error) {
@@ -96,10 +114,10 @@ func apiCallMetricsFromSamples(latencySamples []*model.Sample) (*ApiCallMetrics,
 	return m, nil
 }
 
-func collectApiServerResourceMetrics(context *Context, executor *PrometheusQueryExecutor, endTime time.Time, durationInPromFormat string) {
+func collectApiServerResourceUsageMetrics(context *Context, executor *PrometheusQueryExecutor, endTime time.Time, durationInPromFormat string) {
 	var cpuSamples []*model.Sample
 	for _, q := range quantiles {
-		query := fmt.Sprintf(apiServerCpuQuery, q, apiServerResourceUsageFilters, durationInPromFormat)
+		query := fmt.Sprintf(apiServerCpuQuery, q, apiServerResourceUsageFilters, apiServerCpuRateEvaluationRange, durationInPromFormat, apiServerCpuResolution)
 		samples, err := executor.Query(query, endTime)
 		if err != nil {
 			fmt.Printf("prometheus query execution error: %v", err)
@@ -140,7 +158,7 @@ func collectApiServerResourceMetrics(context *Context, executor *PrometheusQuery
 	if err != nil {
 		fmt.Printf("prometheus metrics parsing error: %v", err)
 	}
-	context.SetApiServerResourceUsageMetrics(resourceUsageMetrics)
+	context.Metrics.ApiServerMetrics.ResourceUsageMetrics = *resourceUsageMetrics
 }
 
 func resourceUsageMetricsFromSamples(cpuSamples []*model.Sample, memorySamples []*model.Sample, threadSamples []*model.Sample) (*ResourceUsageMetrics, error) {
@@ -174,6 +192,96 @@ func resourceUsageMetricsFromSamples(cpuSamples []*model.Sample, memorySamples [
 
 		value := float64(sample.Value)
 		m.ThreadUsageMetric.SetQuantile(quantile, value)
+	}
+
+	return m, nil
+}
+
+func collectEtcdMetrics(context *Context, executor *PrometheusQueryExecutor, endTime time.Time, durationInPromFormat string) {
+	etcdMetrics := &context.Metrics.EtcdMetrics
+
+	leaderElectionsQuery := fmt.Sprintf(etcdLeaderElectionsQuery, etcdCommonFilters, durationInPromFormat)
+	leaderElectionsSamples, err := executor.Query(leaderElectionsQuery, endTime)
+	if err != nil {
+		fmt.Printf("prometheus query execution error: %v", err)
+	}
+	etcdMetrics.LeaderElections = int(math.Round(float64(leaderElectionsSamples[0].Value)))
+
+	var dbSizeSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(etcdDbSizeQuery, q, etcdResourceUsageFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		dbSizeSamples = append(dbSizeSamples, samples...)
+	}
+	dbSizeStatistics, err := metricStatisticsFromSamples[float64](dbSizeSamples)
+	if err != nil {
+		fmt.Printf("prometheus metrics parsing error: %v", err)
+	}
+	etcdMetrics.DbSize = *dbSizeStatistics
+
+	var cpuSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(etcdCpuQuery, q, etcdResourceUsageFilters, etcdCpuRateEvaluationRange, durationInPromFormat, etcdCpuResolution)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		cpuSamples = append(cpuSamples, samples...)
+	}
+
+	var memorySamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(etcdMemoryQuery, q, etcdResourceUsageFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		memorySamples = append(memorySamples, samples...)
+	}
+
+	var threadSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(etcdThreadQuery, q, etcdResourceUsageFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		threadSamples = append(threadSamples, samples...)
+	}
+
+	resourceUsageMetrics, err := resourceUsageMetricsFromSamples(cpuSamples, memorySamples, threadSamples)
+	if err != nil {
+		fmt.Printf("prometheus metrics parsing error: %v", err)
+	}
+	etcdMetrics.ResourceUsageMetrics = *resourceUsageMetrics
+}
+
+func metricStatisticsFromSamples[T int | float64](samples []*model.Sample) (*MetricStatistics[T], error) {
+	m := &MetricStatistics[T]{}
+
+	for _, sample := range samples {
+		quantile, err := strconv.ParseFloat(string(sample.Metric["quantile"]), 64)
+		if err != nil {
+			return nil, err
+		}
+
+		value := T(sample.Value)
+		m.SetQuantile(quantile, value)
 	}
 
 	return m, nil

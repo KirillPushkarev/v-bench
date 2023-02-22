@@ -25,6 +25,6 @@ func main() {
 	metricCollector := measurement.NewMetricCollector()
 	metricCollector.CollectMetrics(benchmarkConfigs[0], measurementContext)
 
-	metricsSummary, _ := json.MarshalIndent(measurementContext.ApiServerMetrics, "", "\t")
+	metricsSummary, _ := json.MarshalIndent(measurementContext.Metrics, "", "\t")
 	fmt.Print(string(metricsSummary))
 }
