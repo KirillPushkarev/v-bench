@@ -1,58 +1,43 @@
 package measurement
 
 import (
-	"fmt"
+	"strings"
 	"time"
 	measurementutil "v-bench/measurement/util"
 )
 
 type ApiCallMetrics struct {
-	Metrics map[string]*ApiCallMetric
+	MetricByKey map[string]*ApiCallMetric
 }
 
-func (m *ApiCallMetrics) getAPICall(resource, subresource, verb, scope string) *ApiCallMetric {
-	key := buildKey(resource, subresource, verb, scope)
-	call, exists := m.Metrics[key]
+type ApiCallMetric struct {
+	Labels     []string                      `json:"labels"`
+	Throughput MetricStatistics[float64]     `json:"throughput"`
+	Latency    measurementutil.LatencyMetric `json:"latency"`
+}
+
+func (m *ApiCallMetrics) SetThroughput(labels []string, quantile float64, throughput float64) {
+	call := m.getAPICall(labels)
+	call.Throughput.SetQuantile(quantile, throughput)
+}
+
+func (m *ApiCallMetrics) SetLatency(labels []string, quantile float64, latency time.Duration) {
+	call := m.getAPICall(labels)
+	call.Latency.SetQuantile(quantile, latency)
+}
+
+func (m *ApiCallMetrics) getAPICall(labels []string) *ApiCallMetric {
+	key := buildKey(labels)
+	call, exists := m.MetricByKey[key]
 	if !exists {
 		call = &ApiCallMetric{
-			Resource:    resource,
-			Subresource: subresource,
-			Verb:        verb,
-			Scope:       scope,
+			Labels: labels,
 		}
-		m.Metrics[key] = call
+		m.MetricByKey[key] = call
 	}
 	return call
 }
 
-type ApiCallMetric struct {
-	Resource    string                        `json:"resource"`
-	Subresource string                        `json:"subresource"`
-	Verb        string                        `json:"verb"`
-	Scope       string                        `json:"scope"`
-	Latency     measurementutil.LatencyMetric `json:"latency"`
-	Count       int                           `json:"count"`
-	SlowCount   int                           `json:"slowCount"`
-}
-
-func buildKey(resource, subresource, verb, scope string) string {
-	return fmt.Sprintf("%s|%s|%s|%s", resource, subresource, verb, scope)
-}
-
-func (m *ApiCallMetrics) SetLatency(resource, subresource, verb, scope string, quantile float64, latency time.Duration) {
-	call := m.getAPICall(resource, subresource, verb, scope)
-	call.Latency.SetQuantile(quantile, latency)
-}
-
-func (m *ApiCallMetrics) GetCount(resource, subresource, verb, scope string) int {
-	call := m.getAPICall(resource, subresource, verb, scope)
-	return call.Count
-}
-
-func (m *ApiCallMetrics) SetCount(resource, subresource, verb, scope string, count int) {
-	if count == 0 {
-		return
-	}
-	call := m.getAPICall(resource, subresource, verb, scope)
-	call.Count = count
+func buildKey(labels []string) string {
+	return strings.Join(labels, "|")
 }
