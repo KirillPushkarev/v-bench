@@ -8,6 +8,7 @@ type Context struct {
 		ApiServerMetrics         ApiServerMetrics
 		EtcdMetrics              EtcdMetrics
 		ControllerManagerMetrics ControllerManagerMetrics
+		SchedulerMetrics         SchedulerMetrics
 	}
 }
 
@@ -23,6 +24,13 @@ type ControllerManagerMetrics struct {
 	WorkQueueWorkDuration  MetricStatistics[float64]
 	ApiServerMetrics       ApiCallMetrics
 	ResourceUsageMetrics   ResourceUsageMetrics
+}
+
+type SchedulerMetrics struct {
+	SchedulingThroughput MetricStatistics[float64]
+	SchedulingLatency    MetricStatistics[float64]
+	ApiServerMetrics     ApiCallMetrics
+	ResourceUsageMetrics ResourceUsageMetrics
 }
 
 type EtcdMetrics struct {

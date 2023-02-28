@@ -40,6 +40,17 @@ const (
 	controllerManagerThreadQuery                 = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
 	controllerManagerCommonFilters               = `job="kube-controller-manager"`
 
+	schedulerSchedulingThroughputQuery  = "quantile_over_time(%.2f, rate(scheduler_e2e_scheduling_duration_seconds_count{%v}[%v])[%v:%v])"
+	schedulerSchedulingLatencyQuery     = "histogram_quantile(%.2f, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{%v}[%v])) by (verb, url, le))"
+	schedulerToApiServerThroughputQuery = "quantile_over_time(%.2f, rate(rest_client_requests_total{%v}[%v])[%v:%v])"
+	schedulerToApiServerLatencyQuery    = "histogram_quantile(%.2f, sum(rate(rest_client_request_duration_seconds_bucket{%v}[%v])) by (verb, url, le))"
+	schedulerCpuQuery                   = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
+	schedulerRateEvaluationRange        = "1m"
+	schedulerRateResolution             = "1m"
+	schedulerMemoryQuery                = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
+	schedulerThreadQuery                = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	schedulerCommonFilters              = `job="kube-scheduler"`
+
 	etcdLeaderElectionsQuery    = "increase(etcd_server_leader_changes_seen_total{%v}[%v])"
 	etcdDbSizeQuery             = "quantile_over_time(%.2f, etcd_mvcc_db_total_size_in_bytes{%v}[%v])"
 	etcdWalSyncQuery            = "histogram_quantile(%.2f, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{%v}[%v])) by (le))"
@@ -79,7 +90,7 @@ func (*MetricCollector) CollectMetrics(benchmarkConfig config.TestConfig, contex
 
 	collectApiServerMetrics(context, executor, endTime, durationInPromFormat)
 	collectControllerManagerMetrics(context, executor, endTime, durationInPromFormat)
-	//collectSchedulerMetrics(durationInPromFormat, executor, endTime, err, context)
+	collectSchedulerMetrics(context, executor, endTime, durationInPromFormat)
 	collectEtcdMetrics(context, executor, endTime, durationInPromFormat)
 	//collectOverallControlPlaneMetrics(durationInPromFormat, executor, endTime, err, context)
 }
@@ -316,6 +327,123 @@ func collectControllerManagerMetrics(context *Context, executor *PrometheusQuery
 		fmt.Printf("prometheus metrics parsing error: %v", err)
 	}
 	controllerManagerMetrics.ResourceUsageMetrics = *resourceUsageMetrics
+}
+
+func collectSchedulerMetrics(context *Context, executor *PrometheusQueryExecutor, endTime time.Time, durationInPromFormat string) {
+	schedulerMetrics := &context.Metrics.SchedulerMetrics
+
+	var schedulingThroughputSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerSchedulingThroughputQuery, q, schedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		schedulingThroughputSamples = append(schedulingThroughputSamples, samples...)
+	}
+	schedulingThroughputStatistics, err := metricStatisticsFromSamples[float64](schedulingThroughputSamples)
+	if err != nil {
+		fmt.Printf("prometheus metrics parsing error: %v", err)
+	}
+	schedulerMetrics.SchedulingThroughput = *schedulingThroughputStatistics
+
+	var schedulingLatencySamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerSchedulingLatencyQuery, q, schedulerCommonFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		schedulingLatencySamples = append(schedulingLatencySamples, samples...)
+	}
+	schedulingLatencyStatistics, err := metricStatisticsFromSamples[float64](schedulingLatencySamples)
+	if err != nil {
+		fmt.Printf("prometheus metrics parsing error: %v", err)
+	}
+	schedulerMetrics.SchedulingLatency = *schedulingLatencyStatistics
+
+	var throughputSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerToApiServerThroughputQuery, q, schedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		throughputSamples = append(throughputSamples, samples...)
+	}
+
+	var latencySamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerToApiServerLatencyQuery, q, schedulerCommonFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		latencySamples = append(latencySamples, samples...)
+	}
+
+	apiCallMetrics, err := apiCallMetricsFromSamples(throughputSamples, latencySamples)
+	if err != nil {
+		fmt.Printf("prometheus metrics parsing error: %v", err)
+	}
+	schedulerMetrics.ApiServerMetrics = *apiCallMetrics
+
+	var cpuSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerCpuQuery, q, schedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		cpuSamples = append(cpuSamples, samples...)
+	}
+
+	var memorySamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerMemoryQuery, q, schedulerCommonFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		memorySamples = append(memorySamples, samples...)
+	}
+
+	var threadSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(schedulerThreadQuery, q, schedulerCommonFilters, durationInPromFormat)
+		samples, err := executor.Query(query, endTime)
+		if err != nil {
+			fmt.Printf("prometheus query execution error: %v", err)
+		}
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		threadSamples = append(threadSamples, samples...)
+	}
+
+	resourceUsageMetrics, err := resourceUsageMetricsFromSamples(cpuSamples, memorySamples, threadSamples)
+	if err != nil {
+		fmt.Printf("prometheus metrics parsing error: %v", err)
+	}
+	schedulerMetrics.ResourceUsageMetrics = *resourceUsageMetrics
 }
 
 func collectEtcdMetrics(context *Context, executor *PrometheusQueryExecutor, endTime time.Time, durationInPromFormat string) {
