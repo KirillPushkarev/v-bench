@@ -15,55 +15,61 @@ import (
 const (
 	numK8sClients = 1
 
+	goProcessCpuQuery            = "quantile_over_time(%.2f, avg(rate(process_cpu_seconds_total{%v}[%v]))[%v:%v])"
+	goProcessRateEvaluationRange = "1m"
+	goProcessRateResolution      = "1m"
+	goProcessMemoryQuery         = "quantile_over_time(%.2f, avg(process_resident_memory_bytes{%v}[%v]))"
+	goProcessThreadQuery         = "quantile_over_time(%.2f, avg(go_goroutines{%v}[%v]))"
+
 	// apiServerLatencyQuery measures 99th percentile of API call latency over given period of time
-	// apiServerLatencyQuery: placeholders should be replaced with (1) quantile (2) apiServerLatencyFilters and (3) query window size.
-	apiServerLatencyQuery         = "histogram_quantile(%.2f, sum(rate(apiserver_request_duration_seconds_bucket{%v}[%v])) by (resource,  subresource, verb, scope, le))"
-	apiServerThroughputQuery      = "quantile_over_time(%.2f, rate(apiserver_request_total{%v}[%v])[%v:%v])"
-	apiServerLatencyFilters       = `job="apiserver", verb!="WATCH", subresource!~"log|exec|portforward|attach|proxy"`
-	apiServerCpuQuery             = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
-	apiServerRateEvaluationRange  = "1m"
-	apiServerRateResolution       = "1m"
-	apiServerMemoryQuery          = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
-	apiServerThreadQuery          = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	// apiServerLatencyQuery: placeholders should be replaced with (1) quantile (2) apiServerApiCallFilters and (3) query window size.
+	apiServerLatencyQuery         = "histogram_quantile(%.2f, sum(rate(apiserver_request_duration_seconds_bucket{%v}[%v])) by (verb, resource, subresource, scope, le))"
+	apiServerThroughputQuery      = "quantile_over_time(%.2f, avg(rate(apiserver_request_total{%v}[%v])) by (verb, resource, subresource, scope, code, le)[%v:%v])"
+	apiServerApiCallFilters       = `job="apiserver", verb!="WATCH", subresource!~"log|exec|portforward|attach|proxy"`
+	apiServerCpuQuery             = goProcessCpuQuery
+	apiServerRateEvaluationRange  = goProcessRateEvaluationRange
+	apiServerRateResolution       = goProcessRateResolution
+	apiServerMemoryQuery          = goProcessMemoryQuery
+	apiServerThreadQuery          = goProcessThreadQuery
 	apiServerResourceUsageFilters = `job="apiserver"`
 
-	controllerManagerWorkQueueAddsQuery          = "quantile_over_time(%.2f, rate(workqueue_adds_total{%v}[%v])[%v:%v])"
-	controllerManagerWorkQueueDepthQuery         = "quantile_over_time(%.2f, rate(workqueue_depth{%v}[%v])[%v:%v])"
+	controllerManagerWorkQueueAddsQuery          = "quantile_over_time(%.2f, avg(rate(workqueue_adds_total{%v}[%v]))[%v:%v])"
+	controllerManagerWorkQueueDepthQuery         = "quantile_over_time(%.2f, avg(rate(workqueue_depth{%v}[%v]))[%v:%v])"
 	controllerManagerWorkQueueQueueDurationQuery = "histogram_quantile(%.2f, sum(rate(workqueue_queue_duration_seconds_bucket{%v}[%v])) by (le))"
 	controllerManagerWorkQueueWorkDurationQuery  = "histogram_quantile(%.2f, sum(rate(workqueue_work_duration_seconds_bucket{%v}[%v])) by (le))"
-	controllerManagerToApiServerThroughputQuery  = "quantile_over_time(%.2f, rate(rest_client_requests_total{%v}[%v])[%v:%v])"
-	controllerManagerToApiServerLatencyQuery     = "histogram_quantile(%.2f, sum(rate(rest_client_request_duration_seconds_bucket{%v}[%v])) by (verb, url, le))"
-	controllerManagerCpuQuery                    = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
-	controllerManagerRateEvaluationRange         = "1m"
-	controllerManagerRateResolution              = "1m"
-	controllerManagerMemoryQuery                 = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
-	controllerManagerThreadQuery                 = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	controllerManagerToApiServerLatencyQuery     = "histogram_quantile(%.2f, sum(rate(rest_client_request_duration_seconds_bucket{%v}[%v])) by (verb, le))"
+	controllerManagerToApiServerThroughputQuery  = "quantile_over_time(%.2f, avg(rate(rest_client_requests_total{%v}[%v])) by (method, code)[%v:%v])"
+	controllerManagerCpuQuery                    = goProcessCpuQuery
+	controllerManagerRateEvaluationRange         = goProcessRateEvaluationRange
+	controllerManagerRateResolution              = goProcessRateResolution
+	controllerManagerMemoryQuery                 = goProcessMemoryQuery
+	controllerManagerThreadQuery                 = goProcessThreadQuery
 	controllerManagerCommonFilters               = `job="kube-controller-manager"`
 
-	schedulerSchedulingThroughputQuery  = "quantile_over_time(%.2f, rate(scheduler_e2e_scheduling_duration_seconds_count{%v}[%v])[%v:%v])"
-	schedulerSchedulingLatencyQuery     = "histogram_quantile(%.2f, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{%v}[%v])) by (verb, url, le))"
-	schedulerToApiServerThroughputQuery = "quantile_over_time(%.2f, rate(rest_client_requests_total{%v}[%v])[%v:%v])"
-	schedulerToApiServerLatencyQuery    = "histogram_quantile(%.2f, sum(rate(rest_client_request_duration_seconds_bucket{%v}[%v])) by (verb, url, le))"
-	schedulerCpuQuery                   = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
-	schedulerRateEvaluationRange        = "1m"
-	schedulerRateResolution             = "1m"
-	schedulerMemoryQuery                = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
-	schedulerThreadQuery                = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	schedulerSchedulingLatencyQuery     = "histogram_quantile(%.2f, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{%v}[%v])))"
+	schedulerSchedulingThroughputQuery  = "quantile_over_time(%.2f, avg(rate(scheduler_scheduling_algorithm_duration_seconds_count{%v}[%v]))[%v:%v])"
+	schedulerToApiServerLatencyQuery    = "histogram_quantile(%.2f, sum(rate(rest_client_request_duration_seconds_bucket{%v}[%v])) by (verb, le))"
+	schedulerToApiServerThroughputQuery = "quantile_over_time(%.2f, avg(rate(rest_client_requests_total{%v}[%v])) by (method, code)[%v:%v])"
+	schedulerCpuQuery                   = goProcessCpuQuery
+	schedulerRateEvaluationRange        = goProcessRateEvaluationRange
+	schedulerRateResolution             = goProcessRateResolution
+	schedulerMemoryQuery                = goProcessMemoryQuery
+	schedulerThreadQuery                = goProcessThreadQuery
 	schedulerCommonFilters              = `job="kube-scheduler"`
 
-	etcdLeaderElectionsQuery    = "increase(etcd_server_leader_changes_seen_total{%v}[%v])"
-	etcdDbSizeQuery             = "quantile_over_time(%.2f, etcd_mvcc_db_total_size_in_bytes{%v}[%v])"
+	etcdLeaderElectionsQuery    = "max(increase(etcd_server_leader_changes_seen_total{%v}[%v]))"
+	etcdDbSizeQuery             = "max(quantile_over_time(%.2f, etcd_mvcc_db_total_size_in_bytes{%v}[%v]))"
 	etcdWalSyncQuery            = "histogram_quantile(%.2f, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{%v}[%v])) by (le))"
 	etcdBackendCommitSyncQuery  = "histogram_quantile(%.2f, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{%v}[%v])) by (le))"
 	etcdProposalsCommittedQuery = "sum(rate(etcd_server_proposals_committed_total{%v}[%v])"
 	etcdProposalsAppliedQuery   = "sum(rate(etcd_server_proposals_applied_total{%v}[%v])"
 	etcdProposalsPendingQuery   = "sum(quantile_over_time(0.5, etcd_server_proposals_pending{%v}[%v]))"
 	etcdProposalsFailedQuery    = "sum(rate(etcd_server_proposals_failed_total{%v}[%v])"
-	etcdCpuQuery                = "quantile_over_time(%.2f, rate(process_cpu_seconds_total{%v}[%v])[%v:%v])"
-	etcdRateEvaluationRange     = "1m"
-	etcdRateResolution          = "1m"
-	etcdMemoryQuery             = "quantile_over_time(%.2f, process_resident_memory_bytes{%v}[%v])"
-	etcdThreadQuery             = "quantile_over_time(%.2f, go_goroutines{%v}[%v])"
+	etcdCpuQuery                = goProcessCpuQuery
+	etcdRateEvaluationRange     = goProcessRateEvaluationRange
+	etcdRateResolution          = goProcessRateResolution
+	etcdMemoryQuery             = goProcessMemoryQuery
+	etcdThreadQuery             = goProcessThreadQuery
 	etcdCommonFilters           = `job="etcd"`
 )
 
@@ -100,7 +106,7 @@ func collectApiServerMetrics(context *Context, executor *PrometheusQueryExecutor
 
 	var throughputSamples []*model.Sample
 	for _, q := range quantiles {
-		query := fmt.Sprintf(apiServerThroughputQuery, q, apiServerLatencyFilters, apiServerRateEvaluationRange, durationInPromFormat, apiServerRateResolution)
+		query := fmt.Sprintf(apiServerThroughputQuery, q, apiServerApiCallFilters, apiServerRateEvaluationRange, durationInPromFormat, apiServerRateResolution)
 		samples, err := executor.Query(query, endTime)
 		if err != nil {
 			fmt.Printf("prometheus query execution error: %v", err)
@@ -113,7 +119,7 @@ func collectApiServerMetrics(context *Context, executor *PrometheusQueryExecutor
 
 	var latencySamples []*model.Sample
 	for _, q := range quantiles {
-		query := fmt.Sprintf(apiServerLatencyQuery, q, apiServerLatencyFilters, durationInPromFormat)
+		query := fmt.Sprintf(apiServerLatencyQuery, q, apiServerApiCallFilters, durationInPromFormat)
 		samples, err := executor.Query(query, endTime)
 		if err != nil {
 			fmt.Printf("prometheus query execution error: %v", err)
