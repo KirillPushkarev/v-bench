@@ -155,7 +155,7 @@ func runTests(benchmarkConfig config.TestConfig) {
 
 	startTime := time.Now()
 	measurementContext := measurement.NewContext(startTime)
-	metricCollector := measurement.NewMetricCollector()
+	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfig.RootKubeConfigPath)
 
 	var wg sync.WaitGroup
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
@@ -191,7 +191,7 @@ func runTests(benchmarkConfig config.TestConfig) {
 
 	wg.Wait()
 
-	metricCollector.CollectMetrics(benchmarkConfig, measurementContext)
+	metricCollector.CollectMetrics(measurementContext)
 
 	fmt.Println("Finished running tests.")
 }

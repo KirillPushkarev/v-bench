@@ -22,8 +22,8 @@ func main() {
 
 	startTime := time.Now().Add(-5 * time.Minute)
 	measurementContext := measurement.NewContext(startTime)
-	metricCollector := measurement.NewMetricCollector()
-	metricCollector.CollectMetrics(benchmarkConfigs[0], measurementContext)
+	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfigs[0].RootKubeConfigPath)
+	metricCollector.CollectMetrics(measurementContext)
 
 	metricsSummary, _ := json.MarshalIndent(measurementContext.Metrics, "", "\t")
 	fmt.Print(string(metricsSummary))

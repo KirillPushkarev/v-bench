@@ -1,6 +1,9 @@
 package measurement
 
-import "time"
+import (
+	"time"
+	"v-bench/measurement/metric"
+)
 
 type Context struct {
 	StartTime time.Time
@@ -13,24 +16,24 @@ type Context struct {
 }
 
 type ApiServerMetrics struct {
-	ApiCallMetrics       ApiCallMetrics
-	ResourceUsageMetrics ResourceUsageMetrics
+	ApiCallMetrics       metric.ApiCallMetrics
+	ResourceUsageMetrics metric.ResourceUsageMetrics
 }
 
 type ControllerManagerMetrics struct {
-	WorkQueueDepth         MetricStatistics[float64]
-	WorkQueueAdds          MetricStatistics[float64]
-	WorkQueueQueueDuration MetricStatistics[float64]
-	WorkQueueWorkDuration  MetricStatistics[float64]
-	ApiServerMetrics       ApiCallMetrics
-	ResourceUsageMetrics   ResourceUsageMetrics
+	WorkQueueDepth         metric.Statistics[float64]
+	WorkQueueAdds          metric.Statistics[float64]
+	WorkQueueQueueDuration metric.Statistics[float64]
+	WorkQueueWorkDuration  metric.Statistics[float64]
+	ApiServerMetrics       metric.ApiCallMetrics
+	ResourceUsageMetrics   metric.ResourceUsageMetrics
 }
 
 type SchedulerMetrics struct {
-	SchedulingThroughput MetricStatistics[float64]
-	SchedulingLatency    MetricStatistics[float64]
-	ApiServerMetrics     ApiCallMetrics
-	ResourceUsageMetrics ResourceUsageMetrics
+	SchedulingThroughput metric.Statistics[float64]
+	SchedulingLatency    metric.Statistics[float64]
+	ApiServerMetrics     metric.ApiCallMetrics
+	ResourceUsageMetrics metric.ResourceUsageMetrics
 }
 
 type EtcdMetrics struct {
@@ -41,10 +44,10 @@ type EtcdMetrics struct {
 		Pending   float64
 		Failed    float64
 	}
-	DbSize                    MetricStatistics[float64]
-	WalSyncDuration           MetricStatistics[float64]
-	BackendCommitSyncDuration MetricStatistics[float64]
-	ResourceUsageMetrics      ResourceUsageMetrics
+	DbSize                    metric.Statistics[float64]
+	WalSyncDuration           metric.Statistics[float64]
+	BackendCommitSyncDuration metric.Statistics[float64]
+	ResourceUsageMetrics      metric.ResourceUsageMetrics
 }
 
 func NewContext(startTime time.Time) *Context {
