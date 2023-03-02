@@ -1,9 +1,7 @@
 package metric
 
 type ResourceUsageMetrics struct {
-	CpuUsageMetric    Statistics[float64]
-	MemoryUsageMetric Statistics[float64]
-	ThreadUsageMetric Statistics[float64]
+	CpuUsage    Statistics[float64] `json:"cpu_usage"`
+	MemoryUsage Statistics[float64] `json:"memory_usage"`
+	ThreadUsage Statistics[float64] `json:"thread_usage"`
 }
-
-type ResourceUsageMetric = Statistics[float64]

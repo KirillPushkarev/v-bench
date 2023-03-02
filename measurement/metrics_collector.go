@@ -614,7 +614,7 @@ func resourceUsageMetricsFromSamples(cpuSamples []*model.Sample, memorySamples [
 		}
 
 		value := math.Round(float64(sample.Value)*1000) / 1000
-		m.CpuUsageMetric.SetQuantile(quantile, value)
+		m.CpuUsage.SetQuantile(quantile, value)
 	}
 
 	for _, sample := range memorySamples {
@@ -624,7 +624,7 @@ func resourceUsageMetricsFromSamples(cpuSamples []*model.Sample, memorySamples [
 		}
 
 		value := memoryConverter(sample.Value)
-		m.MemoryUsageMetric.SetQuantile(quantile, value)
+		m.MemoryUsage.SetQuantile(quantile, value)
 	}
 
 	for _, sample := range threadSamples {
@@ -634,7 +634,7 @@ func resourceUsageMetricsFromSamples(cpuSamples []*model.Sample, memorySamples [
 		}
 
 		value := math.Round(float64(sample.Value))
-		m.ThreadUsageMetric.SetQuantile(quantile, value)
+		m.ThreadUsage.SetQuantile(quantile, value)
 	}
 
 	return m, nil
