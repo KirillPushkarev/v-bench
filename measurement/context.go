@@ -7,12 +7,14 @@ import (
 
 type Context struct {
 	StartTime time.Time
-	Metrics   struct {
-		ApiServerMetrics         ApiServerMetrics         `json:"api_server_metrics"`
-		ControllerManagerMetrics ControllerManagerMetrics `json:"controller_manager_metrics"`
-		SchedulerMetrics         SchedulerMetrics         `json:"scheduler_metrics"`
-		EtcdMetrics              EtcdMetrics              `json:"etcd_metrics"`
-	}
+	Metrics   Metrics
+}
+
+type Metrics struct {
+	ApiServerMetrics         ApiServerMetrics         `json:"api_server_metrics"`
+	ControllerManagerMetrics ControllerManagerMetrics `json:"controller_manager_metrics"`
+	SchedulerMetrics         SchedulerMetrics         `json:"scheduler_metrics"`
+	EtcdMetrics              EtcdMetrics              `json:"etcd_metrics"`
 }
 
 type ApiServerMetrics struct {

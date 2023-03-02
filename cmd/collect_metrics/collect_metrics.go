@@ -1,16 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"time"
 	"v-bench/internal/cmd"
 	"v-bench/measurement"
+	"v-bench/reporting"
 )
 
 const (
 	defaultConfigPath = "./config/metrics/config.json"
+	defaultOutputPath = "./"
 )
 
 func main() {
@@ -25,6 +25,6 @@ func main() {
 	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfigs[0].RootKubeConfigPath)
 	metricCollector.CollectMetrics(measurementContext)
 
-	metricsSummary, _ := json.MarshalIndent(measurementContext.Metrics, "", "\t")
-	fmt.Print(string(metricsSummary))
+	reporter := &reporting.JsonReporter{}
+	reporter.Report(defaultOutputPath, measurementContext)
 }

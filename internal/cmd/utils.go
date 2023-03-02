@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +13,7 @@ import (
 	"time"
 	"v-bench/config"
 	"v-bench/measurement"
+	"v-bench/reporting"
 	"v-bench/virtual_cluster"
 )
 
@@ -111,28 +112,28 @@ func createInitialResources(benchmarkConfig config.TestConfig) {
 		createNsCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespaces", "initial")
 		stdout, err := createNsCmd.Output()
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Error(err.Error())
 			panic(err)
 		}
-		fmt.Println(string(stdout))
+		log.Info(string(stdout))
 
 		for i := 0; i < benchmarkConfig.InitialResources.ConfigMap; i++ {
 			createConfigMapCmdShellCommand := fmt.Sprintf("sed \"s/{{configmap-name}}/configmap-%v/g\" ../../k8s-specs/prepopulate/configmap-1m.yaml | kubectl --kubeconfig=%v create -f -;", i, kubeconfigPath)
 			createConfigMapCmd := exec.Command("bash", "-c", createConfigMapCmdShellCommand)
 			stdout, err := createConfigMapCmd.Output()
 			if err != nil {
-				fmt.Println(err.Error())
+				log.Error(err.Error())
 				panic(err)
 			}
-			fmt.Println(string(stdout))
+			log.Info(string(stdout))
 		}
 	}
 
-	fmt.Println("Created initial resources.")
+	log.Info("Created initial resources.")
 }
 
 func runTests(benchmarkConfig config.TestConfig) {
-	experimentDirName, err := getExperimentDirName(benchmarkConfig)
+	experimentDirName, err := createExperimentDir(benchmarkConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,11 +193,13 @@ func runTests(benchmarkConfig config.TestConfig) {
 	wg.Wait()
 
 	metricCollector.CollectMetrics(measurementContext)
+	reporter := &reporting.JsonReporter{}
+	reporter.Report(testOutputPath, measurementContext)
 
-	fmt.Println("Finished running tests.")
+	log.Info("Finished running tests.")
 }
 
-func getExperimentDirName(benchmarkConfig config.TestConfig) (string, error) {
+func createExperimentDir(benchmarkConfig config.TestConfig) (string, error) {
 	i := 1
 	currentDate := time.Now().Format("2006_01_02")
 	experimentDirName := fmt.Sprintf("%v_%03d", currentDate, i)
@@ -259,11 +262,11 @@ func cleanupInitialResources(benchmarkConfig config.TestConfig) {
 		cmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)), "delete", "namespaces", "initial")
 		stdout, err := cmd.Output()
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Error(err.Error())
 			panic(err)
 		}
-		fmt.Println(string(stdout))
+		log.Info(string(stdout))
 	}
 
-	fmt.Println("Deleted initial resources.")
+	log.Info("Deleted initial resources.")
 }
