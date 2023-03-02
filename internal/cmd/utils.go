@@ -63,25 +63,21 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
 	for _, benchmarkConfigPath := range benchmarkConfigPaths {
 		configFile, err := os.OpenFile(benchmarkConfigPath, os.O_RDWR, 0666)
 		if err != nil {
-			fmt.Printf("Can not open benchmark config file %v, benchmark exited. \n",
-				benchmarkConfigPath)
-			os.Exit(1)
+			log.Fatalf("Can not open benchmark config file %v, benchmark exited. \n", benchmarkConfigPath)
 		}
 
 		decoder := json.NewDecoder(configFile)
 		testConfig := config.TestConfig{ConfigPath: benchmarkConfigPath}
 		err = decoder.Decode(&testConfig)
-
 		if err != nil {
-			fmt.Printf("Can not parse benchmark config file, error: \n %v \n", err)
-			os.Exit(1)
+			log.Fatalf("Can not parse benchmark config file, error: \n %v \n", err)
 		}
 
 		testConfigs = append(testConfigs, testConfig)
 
 		err = configFile.Close()
 		if err != nil {
-			fmt.Printf("Can not close benchmark config file, error: \n %v \n", err)
+			log.Fatalf("Can not close benchmark config file, error: \n %v \n", err)
 		}
 	}
 
@@ -109,11 +105,10 @@ func createInitialResources(benchmarkConfig config.TestConfig) {
 
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		kubeconfigPath := filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)
-		createNsCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespaces", "initial")
-		stdout, err := createNsCmd.Output()
+		createNamespaceCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespaces", "initial")
+		stdout, err := createNamespaceCmd.Output()
 		if err != nil {
-			log.Error(err.Error())
-			panic(err)
+			log.Fatal(err)
 		}
 		log.Info(string(stdout))
 
@@ -122,8 +117,7 @@ func createInitialResources(benchmarkConfig config.TestConfig) {
 			createConfigMapCmd := exec.Command("bash", "-c", createConfigMapCmdShellCommand)
 			stdout, err := createConfigMapCmd.Output()
 			if err != nil {
-				log.Error(err.Error())
-				panic(err)
+				log.Fatal(err)
 			}
 			log.Info(string(stdout))
 		}
@@ -151,8 +145,8 @@ func runTests(benchmarkConfig config.TestConfig) {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Created directory for test run: %v.\n", testOutputPath)
-	fmt.Printf("Running test for all clusters in parallel...\n")
+	log.Infof("Created directory for test run: %v.", testOutputPath)
+	log.Info("Running test for all clusters in parallel...")
 
 	startTime := time.Now()
 	measurementContext := measurement.NewContext(startTime)
@@ -172,18 +166,18 @@ func runTests(benchmarkConfig config.TestConfig) {
 			cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)))
 			outfile, err := os.Create(filepath.Join(testOutputPath, clusterConfig.Name, stdoutFileName))
 			if err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
 			cmd.Stdout = outfile
 
 			err = cmd.Run()
 			if err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
 
 			err = outfile.Close()
 			if err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
 
 			wg.Done()
@@ -225,6 +219,7 @@ func isFileOrDirExisting(path string) (bool, error) {
 	if os.IsNotExist(err) {
 		return false, nil
 	}
+
 	return false, err
 }
 
@@ -242,14 +237,22 @@ func copyFile(sourcePath, destinationPath string) (bytesWritten int64, err error
 	if err != nil {
 		return 0, err
 	}
-	defer source.Close()
 
 	destination, err := os.Create(destinationPath)
 	if err != nil {
 		return 0, err
 	}
-	defer destination.Close()
 	nBytes, err := io.Copy(destination, source)
+
+	err = source.Close()
+	if err != nil {
+		return 0, err
+	}
+	err = destination.Close()
+	if err != nil {
+		return 0, err
+	}
+
 	return nBytes, err
 }
 
@@ -262,8 +265,7 @@ func cleanupInitialResources(benchmarkConfig config.TestConfig) {
 		cmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)), "delete", "namespaces", "initial")
 		stdout, err := cmd.Output()
 		if err != nil {
-			log.Error(err.Error())
-			panic(err)
+			log.Fatal(err)
 		}
 		log.Info(string(stdout))
 	}

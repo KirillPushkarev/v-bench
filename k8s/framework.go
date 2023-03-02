@@ -18,7 +18,7 @@ package k8s
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
+	log "github.com/sirupsen/logrus"
 	// ensure auth plugins are loaded
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -30,7 +30,7 @@ type Framework struct {
 }
 
 func NewFramework(kubeConfigPath string, clientsNumber int) (*Framework, error) {
-	klog.Infof("Creating framework with %d clients and %q kubeconfig.", clientsNumber, kubeConfigPath)
+	log.Infof("Creating framework with %d clients and %q kubeconfig.", clientsNumber, kubeConfigPath)
 	var err error
 	f := Framework{}
 	if f.clientSets, err = NewMultiClientSet(kubeConfigPath, clientsNumber); err != nil {

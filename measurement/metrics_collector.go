@@ -137,7 +137,7 @@ func (mc *MetricCollector) collectApiServerMetrics(context *Context, endTime tim
 
 	apiCallMetrics, err := apiServerCallInternalMetricsFromSamples(throughputSamples, latencySamples)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		apiServerMetrics.ApiCallMetrics = *apiCallMetrics
 	}
@@ -147,7 +147,7 @@ func (mc *MetricCollector) collectApiServerMetrics(context *Context, endTime tim
 }
 
 func logQueryExecutionError(err error, query string) {
-	log.Error("prometheus query execution error: %v, original query: %v", err, query)
+	log.Errorf("prometheus query execution error: %v, original query: %v", err, query)
 }
 
 func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, endTime time.Time, durationInPromFormat string) {
@@ -172,7 +172,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, end
 	}
 	queueDepthStatistics, err := metricStatisticsFromSamples[float64](queueDepthSamples, queueDepthConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		controllerManagerMetrics.WorkQueueDepth = *queueDepthStatistics
 	}
@@ -193,7 +193,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, end
 	}
 	queueAddStatistics, err := metricStatisticsFromSamples[float64](queueAddSamples, rateConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		controllerManagerMetrics.WorkQueueAdds = *queueAddStatistics
 	}
@@ -214,7 +214,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, end
 	}
 	queueQueueDurationStatistics, err := metricStatisticsFromSamples[float64](queueQueueDurationSamples, durationConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		controllerManagerMetrics.WorkQueueQueueDuration = *queueQueueDurationStatistics
 	}
@@ -235,7 +235,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, end
 	}
 	queueWorkDurationStatistics, err := metricStatisticsFromSamples[float64](queueWorkDurationSamples, durationConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		controllerManagerMetrics.WorkQueueWorkDuration = *queueWorkDurationStatistics
 	}
@@ -272,7 +272,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, end
 
 	apiCallMetrics, err := apiServerCallExternalMetricsFromSamples(apiServerThroughputSamples, apiServerLatencySamples)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		controllerManagerMetrics.ApiServerMetrics = *apiCallMetrics
 	}
@@ -300,7 +300,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, endTime tim
 	}
 	schedulingThroughputStatistics, err := metricStatisticsFromSamples[float64](schedulingThroughputSamples, rateConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		schedulerMetrics.SchedulingThroughput = *schedulingThroughputStatistics
 	}
@@ -321,7 +321,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, endTime tim
 	}
 	schedulingLatencyStatistics, err := metricStatisticsFromSamples[float64](schedulingLatencySamples, durationConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		schedulerMetrics.SchedulingLatency = *schedulingLatencyStatistics
 	}
@@ -358,7 +358,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, endTime tim
 
 	apiCallMetrics, err := apiServerCallExternalMetricsFromSamples(apiServerThroughputSamples, apiServerLatencySamples)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		schedulerMetrics.ApiServerMetrics = *apiCallMetrics
 	}
@@ -394,7 +394,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, endTime time.Tim
 	}
 	dbSizeStatistics, err := metricStatisticsFromSamples[float64](dbSizeSamples, memoryConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		etcdMetrics.DbSize = *dbSizeStatistics
 	}
@@ -415,7 +415,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, endTime time.Tim
 	}
 	walSyncStatistics, err := metricStatisticsFromSamples[float64](walSyncSamples, durationConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		etcdMetrics.WalSyncDuration = *walSyncStatistics
 	}
@@ -436,7 +436,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, endTime time.Tim
 	}
 	backendCommitSyncStatistics, err := metricStatisticsFromSamples[float64](backendCommitSyncSamples, durationConverter)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		etcdMetrics.BackendCommitSyncDuration = *backendCommitSyncStatistics
 	}
@@ -599,7 +599,7 @@ func (mc *MetricCollector) queryForResourceUsage(filters string, durationInPromF
 
 	resourceUsageMetrics, err := resourceUsageMetricsFromSamples(cpuSamples, memorySamples, threadSamples)
 	if err != nil {
-		log.Error("prometheus metrics parsing error: %v", err)
+		log.Errorf("prometheus metrics parsing error: %v", err)
 	}
 	return resourceUsageMetrics
 }

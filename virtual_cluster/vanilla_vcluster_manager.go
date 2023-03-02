@@ -21,14 +21,14 @@ func (StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
 		createCmd := exec.Command("vcluster", createCmdArgs...)
 		stdout, err := createCmd.CombinedOutput()
 		if err != nil {
-			log.Error(err.Error())
+			log.Fatal(err)
 		}
 		log.Info(string(stdout))
 
 		connectCmd := exec.Command("vcluster", "connect", clusterConfig.Name, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)))
 		stdout, err = connectCmd.Output()
 		if err != nil {
-			log.Error(err.Error())
+			log.Fatal(err)
 		}
 		log.Info(string(stdout))
 	}
@@ -41,7 +41,7 @@ func (StandardVirtualClusterManager) Delete(benchmarkConfig config.TestConfig) {
 		cmd := exec.Command("vcluster", "delete", clusterConfig.Name)
 		stdout, err := cmd.Output()
 		if err != nil {
-			log.Error(err.Error())
+			log.Fatal(err)
 		}
 		log.Info(string(stdout))
 	}

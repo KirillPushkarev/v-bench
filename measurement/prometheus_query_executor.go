@@ -3,8 +3,8 @@ package measurement
 import (
 	"fmt"
 	"github.com/prometheus/common/model"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
 	"math"
 	"time"
 	"v-bench/measurement/util"
@@ -35,7 +35,7 @@ func (e *PrometheusQueryExecutor) Query(query string, queryTime time.Time) ([]*m
 	var body []byte
 	var queryErr error
 
-	klog.V(2).Infof("Executing %q at %v", query, queryTime.Format(time.RFC3339))
+	log.Debugf("Executing %q at %v", query, queryTime.Format(time.RFC3339))
 	if err := wait.PollImmediate(queryInterval, queryTimeout, func() (bool, error) {
 		body, queryErr = e.client.Query(query, queryTime)
 		if queryErr != nil {
@@ -64,6 +64,6 @@ func (e *PrometheusQueryExecutor) Query(query string, queryTime time.Time) ([]*m
 			resultSamples = append(resultSamples, sample)
 		}
 	}
-	klog.V(4).Infof("Got %d samples", len(resultSamples))
+	log.Debugf("Got %d samples", len(resultSamples))
 	return resultSamples, nil
 }
