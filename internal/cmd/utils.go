@@ -197,7 +197,7 @@ func runTests(benchmarkConfig config.TestConfig) {
 
 	wg.Wait()
 
-	metricCollector.CollectMetrics(measurementContext, measurement.NewCollectConfig(true))
+	metricCollector.CollectMetrics(measurementContext, CollectConfigFromTestConfig(benchmarkConfig))
 	reporter := &reporting.JsonReporter{}
 	reporter.Report(testOutputPath, measurementContext)
 
@@ -282,4 +282,12 @@ func cleanupInitialResources(benchmarkConfig config.TestConfig) {
 	}
 
 	log.Info("Deleted initial resources.")
+}
+
+func CollectConfigFromTestConfig(testConfig config.TestConfig) *measurement.CollectConfig {
+	if testConfig.ClusterType == config.HostCluster {
+		return measurement.NewCollectConfig(true)
+	}
+
+	return measurement.NewCollectConfig(false)
 }

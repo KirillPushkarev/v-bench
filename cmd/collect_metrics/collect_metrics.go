@@ -26,7 +26,7 @@ func main() {
 	startTime := time.Now().Add(-5 * time.Minute)
 	measurementContext := measurement.NewContext([]string{*clusterName}, startTime)
 	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfigs[0].RootKubeConfigPath)
-	metricCollector.CollectMetrics(measurementContext, measurement.NewCollectConfig(false))
+	metricCollector.CollectMetrics(measurementContext, cmd.CollectConfigFromTestConfig(benchmarkConfigs[0]))
 
 	reporter := &reporting.JsonReporter{}
 	reporter.Report(*outputPath, measurementContext)
