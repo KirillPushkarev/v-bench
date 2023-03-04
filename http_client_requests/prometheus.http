@@ -5,3 +5,7 @@ GET localhost:30900/api/v1/labels?match[]=rest_client_request_duration_seconds_b
 GET localhost:30900/api/v1/label/metrics_path/values?match[]=rest_client_request_duration_seconds_bucket
 
 ###
+
+GET localhost:30900/api/v1/targets?state=active
+
+###

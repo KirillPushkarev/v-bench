@@ -123,16 +123,16 @@ func (mc *MetricCollector) CollectMetrics(context *Context, collectConfig *Colle
 	duration := endTime.Sub(context.StartTime)
 	durationInPromFormat := measurementutil.ToPrometheusTime(duration)
 
-	mc.collectApiServerMetrics(context, collectConfig, metricFilters, endTime, durationInPromFormat)
-	mc.collectControllerManagerMetrics(context, collectConfig, metricFilters, endTime, durationInPromFormat)
+	mc.collectApiServerMetrics(context, metricFilters, endTime, durationInPromFormat)
+	mc.collectControllerManagerMetrics(context, metricFilters, endTime, durationInPromFormat)
 	if collectConfig.ShouldCollectScheduler {
-		mc.collectSchedulerMetrics(context, collectConfig, metricFilters, endTime, durationInPromFormat)
+		mc.collectSchedulerMetrics(context, metricFilters, endTime, durationInPromFormat)
 	}
-	mc.collectEtcdMetrics(context, collectConfig, metricFilters, endTime, durationInPromFormat)
+	mc.collectEtcdMetrics(context, metricFilters, endTime, durationInPromFormat)
 	//collectOverallControlPlaneMetrics(durationInPromFormat, executor, endTime, err, context)
 }
 
-func (mc *MetricCollector) collectApiServerMetrics(context *Context, config *CollectConfig, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
+func (mc *MetricCollector) collectApiServerMetrics(context *Context, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
 	apiServerMetrics := &context.Metrics.ApiServerMetrics
 
 	var throughputSamples []*model.Sample
@@ -180,7 +180,7 @@ func logQueryExecutionError(err error, query string) {
 	log.Errorf("prometheus query execution error: %v, original query: %v", err, query)
 }
 
-func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, config *CollectConfig, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
+func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
 	controllerManagerMetrics := &context.Metrics.ControllerManagerMetrics
 
 	var queueDepthSamples []*model.Sample
@@ -311,7 +311,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, con
 	controllerManagerMetrics.ResourceUsageMetrics = *resourceUsageMetrics
 }
 
-func (mc *MetricCollector) collectSchedulerMetrics(context *Context, config *CollectConfig, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
+func (mc *MetricCollector) collectSchedulerMetrics(context *Context, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
 	schedulerMetrics := &context.Metrics.SchedulerMetrics
 
 	var schedulingThroughputSamples []*model.Sample
@@ -397,7 +397,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, config *Col
 	schedulerMetrics.ResourceUsageMetrics = *resourceUsageMetrics
 }
 
-func (mc *MetricCollector) collectEtcdMetrics(context *Context, config *CollectConfig, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
+func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
 	etcdMetrics := &context.Metrics.EtcdMetrics
 
 	leaderElectionsQuery := fmt.Sprintf(etcdLeaderElectionsQuery, filters.EtcdCommonFilters, durationInPromFormat)

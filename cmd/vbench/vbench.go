@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	log "github.com/sirupsen/logrus"
 	"v-bench/internal/cmd"
 	"v-bench/virtual_cluster"
 )
@@ -18,9 +19,11 @@ func main() {
 	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(benchmarkConfigPath)
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
-	vclusterManager := virtual_cluster.NewStandardVirtualClusterManager()
-
 	for _, benchmarkConfig := range benchmarkConfigs {
+		vclusterManager, err := virtual_cluster.NewStandardVirtualClusterManager(benchmarkConfig.RootKubeConfigPath)
+		if err != nil {
+			log.Fatal(err)
+		}
 		cmd.RunExperiment(benchmarkConfig, vclusterManager)
 	}
 }

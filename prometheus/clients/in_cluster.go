@@ -28,6 +28,10 @@ type inClusterPrometheusClient struct {
 	client clientset.Interface
 }
 
+func NewInClusterPrometheusClient(c clientset.Interface) Client {
+	return &inClusterPrometheusClient{client: c}
+}
+
 func (icpc *inClusterPrometheusClient) Query(query string, queryTime time.Time) ([]byte, error) {
 	params := map[string]string{
 		"query": query,
@@ -39,6 +43,9 @@ func (icpc *inClusterPrometheusClient) Query(query string, queryTime time.Time) 
 		DoRaw(context.TODO())
 }
 
-func NewInClusterPrometheusClient(c clientset.Interface) Client {
-	return &inClusterPrometheusClient{client: c}
+func (icpc *inClusterPrometheusClient) Targets(params map[string]string) ([]byte, error) {
+	return icpc.client.CoreV1().
+		Services("monitoring").
+		ProxyGet("http", "prometheus-k8s", "9090", "api/v1/targets", params).
+		DoRaw(context.TODO())
 }

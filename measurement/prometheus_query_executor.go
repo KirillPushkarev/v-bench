@@ -2,6 +2,7 @@ package measurement
 
 import (
 	"fmt"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -66,4 +67,35 @@ func (e *PrometheusQueryExecutor) Query(query string, queryTime time.Time) ([]*m
 	}
 	log.Debugf("Got %d samples", len(resultSamples))
 	return resultSamples, nil
+}
+
+func (e *PrometheusQueryExecutor) Targets(params map[string]string) ([]v1.ActiveTarget, error) {
+	var body []byte
+	var queryErr error
+
+	log.Debugf("Executing query for retrieving targets")
+
+	if err := wait.PollImmediate(queryInterval, queryTimeout, func() (bool, error) {
+		body, queryErr = e.client.Targets(params)
+		if queryErr != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		if queryErr != nil {
+			resp := "(empty)"
+			if body != nil {
+				resp = string(body)
+			}
+			return nil, fmt.Errorf("query error: %v [body: %s]", queryErr, resp)
+		}
+		return nil, fmt.Errorf("error: %v", err)
+	}
+
+	targets, err := util.ExtractTargets(body)
+	if err != nil {
+		return nil, fmt.Errorf("extracting error: %v", err)
+	}
+
+	return targets, nil
 }

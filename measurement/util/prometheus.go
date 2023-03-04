@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	"time"
 )
@@ -91,4 +92,27 @@ func ToPrometheusTime(t time.Duration) string {
 		return fmt.Sprintf("%ds", int64(t)/int64(time.Second))
 	}
 	return fmt.Sprintf("%dm", int64(t)/int64(time.Minute))
+}
+
+type promTargetsResponse struct {
+	Status string                  `json:"status"`
+	Data   promTargetsResponseData `json:"data"`
+}
+
+type promTargetsResponseData struct {
+	ActiveTargets  []v1.ActiveTarget `json:"activeTargets"`
+	DroppedTargets []v1.ActiveTarget `json:"droppedTargets"`
+}
+
+func ExtractTargets(response []byte) ([]v1.ActiveTarget, error) {
+	var ptr promTargetsResponse
+	if err := json.Unmarshal(response, &ptr); err != nil {
+		return nil, err
+	}
+	if ptr.Status != "success" {
+		return nil, fmt.Errorf("non-success response status: %v", ptr.Status)
+	}
+
+	activeTargets := ptr.Data.ActiveTargets
+	return activeTargets, nil
 }

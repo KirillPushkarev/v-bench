@@ -1,8 +1,10 @@
 package config
 
 type ClusterConfig struct {
-	Name           string `json:"name"`
-	KubeConfigPath string `json:"kubeconfig"`
+	Name                      string `json:"name"`
+	Namespace                 string `json:"namespace"`
+	KubeConfigPath            string `json:"kubeconfig"`
+	ShouldProvisionMonitoring bool   `json:"should_provision_monitoring"`
 }
 
 type ClusterType string

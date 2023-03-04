@@ -13,8 +13,13 @@ type StandardVirtualClusterManager struct {
 	PrometheusProvisioner *monitoring.PrometheusProvisioner
 }
 
-func NewStandardVirtualClusterManager() *StandardVirtualClusterManager {
-	return &StandardVirtualClusterManager{PrometheusProvisioner: monitoring.NewPrometheusProvisioner()}
+func NewStandardVirtualClusterManager(kubeconfigPath string) (*StandardVirtualClusterManager, error) {
+	provisioner, err := monitoring.NewPrometheusProvisioner(kubeconfigPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StandardVirtualClusterManager{PrometheusProvisioner: provisioner}, nil
 }
 
 func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
@@ -35,7 +40,12 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 		}
 		log.Info(string(stdout))
 
-		virtualClusterManager.PrometheusProvisioner.Provision(clusterConfig.KubeConfigPath)
+		if clusterConfig.ShouldProvisionMonitoring {
+			err = virtualClusterManager.PrometheusProvisioner.Provision(monitoring.NewProvisionerTemplateDto(clusterConfig.Name, clusterConfig.Namespace))
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 
 	log.Info("Created virtual clusters.")

@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  namespace: {{ .ClusterNamespace }}
+  name: syncer
+  labels:
+    app.kubernetes.io/name: syncer
+    app.kubernetes.io/part-of: kube-prometheus
+spec:
+  endpoints:
+  - interval: 30s
+    relabelings:
+    - targetLabel: cluster
+      replacement: {{ .ClusterName }}
+    port: https
+    scheme: https
+    tlsConfig:
+      cert:
+        secret:
+          key: client-certificate
+          name: vc-{{ .ClusterName }}
+      keySecret:
+        key: client-key
+        name: vc-{{ .ClusterName }}
+      ca:
+        secret:
+          key: certificate-authority
+          name: vc-{{ .ClusterName }}
+  jobLabel: component
+  namespaceSelector:
+    matchNames:
+      - {{ .ClusterNamespace }}
+  selector:
+    matchLabels:
+      app: vcluster
+      release: {{ .ClusterName }}

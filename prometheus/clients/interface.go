@@ -25,4 +25,6 @@ type Client interface {
 	// Query sends a GET request to Prometheus with the "query" field
 	// in the URL's query string set using the provided arguments.
 	Query(query string, queryTime time.Time) ([]byte, error)
+
+	Targets(params map[string]string) ([]byte, error)
 }
