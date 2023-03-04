@@ -8,6 +8,7 @@ import (
 
 const (
 	defaultConfigPath = "./config/default/config.json"
+	defaultOutputPath = "./"
 )
 
 func main() {

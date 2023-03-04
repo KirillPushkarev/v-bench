@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/name: etcd
+  name: etcd
+  namespace: vcluster-vcluster1
+spec:
+  endpoints:
+  - interval: 30s
+    relabelings:
+    - targetLabel: cluster
+      replacement: vcluster1
+    - targetLabel: job
+      replacement: etcd
+    port: metrics
+    scheme: http
+#    scheme: https
+#    tlsConfig:
+#      cert:
+#        secret:
+#          key: apiserver-etcd-client.crt
+#          name: vcluster1-certs
+#      keySecret:
+#        key: apiserver-etcd-client.key
+#        name: vcluster1-certs
+#      ca:
+#        secret:
+#          key: etcd-ca.crt
+#          name: vcluster1-certs
+#      insecureSkipVerify: true
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app: vcluster-etcd
+      release: vcluster1

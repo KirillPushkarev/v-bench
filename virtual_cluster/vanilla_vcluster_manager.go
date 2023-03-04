@@ -6,15 +6,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"v-bench/config"
+	"v-bench/virtual_cluster/monitoring"
 )
 
-type StandardVirtualClusterManager struct{}
-
-func NewStandardVirtualClusterManager() *StandardVirtualClusterManager {
-	return &StandardVirtualClusterManager{}
+type StandardVirtualClusterManager struct {
+	PrometheusProvisioner *monitoring.PrometheusProvisioner
 }
 
-func (StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
+func NewStandardVirtualClusterManager() *StandardVirtualClusterManager {
+	return &StandardVirtualClusterManager{PrometheusProvisioner: monitoring.NewPrometheusProvisioner()}
+}
+
+func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		createCmdArgs := []string{"create", clusterConfig.Name, "--connect=false"}
 		createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
@@ -31,6 +34,8 @@ func (StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
 			log.Fatal(err)
 		}
 		log.Info(string(stdout))
+
+		virtualClusterManager.PrometheusProvisioner.Provision(clusterConfig.KubeConfigPath)
 	}
 
 	log.Info("Created virtual clusters.")

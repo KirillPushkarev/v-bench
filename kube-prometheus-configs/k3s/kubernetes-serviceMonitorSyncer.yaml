@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  namespace: vcluster-vcluster1
+  name: syncer
+  labels:
+    app.kubernetes.io/name: syncer
+    app.kubernetes.io/part-of: kube-prometheus
+spec:
+  endpoints:
+  - interval: 30s
+    relabelings:
+    - targetLabel: cluster
+      replacement: vcluster1
+    port: https
+    scheme: https
+    tlsConfig:
+      cert:
+        secret:
+          key: client-certificate
+          name: vc-vcluster1
+      keySecret:
+        key: client-key
+        name: vc-vcluster1
+      ca:
+        secret:
+          key: certificate-authority
+          name: vc-vcluster1
+  jobLabel: component
+  namespaceSelector:
+    matchNames:
+      - vcluster-vcluster1
+  selector:
+    matchLabels:
+      app: vcluster
+      release: vcluster1

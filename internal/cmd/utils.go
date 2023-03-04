@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 	"v-bench/config"
+	"v-bench/internal/util"
 	"v-bench/measurement"
 	"v-bench/reporting"
 	"v-bench/virtual_cluster"
@@ -149,7 +150,17 @@ func runTests(benchmarkConfig config.TestConfig) {
 	log.Info("Running test for all clusters in parallel...")
 
 	startTime := time.Now()
-	measurementContext := measurement.NewContext(startTime)
+	clusterNames := util.Map(
+		benchmarkConfig.ClusterConfigs,
+		func(clusterConfig config.ClusterConfig) string {
+			if clusterConfig.Name != "host" {
+				return clusterConfig.Name
+			} else {
+				return ""
+			}
+		},
+	)
+	measurementContext := measurement.NewContext(clusterNames, startTime)
 	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfig.RootKubeConfigPath)
 
 	var wg sync.WaitGroup
@@ -186,7 +197,7 @@ func runTests(benchmarkConfig config.TestConfig) {
 
 	wg.Wait()
 
-	metricCollector.CollectMetrics(measurementContext)
+	metricCollector.CollectMetrics(measurementContext, measurement.NewCollectConfig(true))
 	reporter := &reporting.JsonReporter{}
 	reporter.Report(testOutputPath, measurementContext)
 

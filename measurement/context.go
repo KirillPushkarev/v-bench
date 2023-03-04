@@ -6,8 +6,9 @@ import (
 )
 
 type Context struct {
-	StartTime time.Time
-	Metrics   Metrics
+	ClusterNames []string
+	StartTime    time.Time
+	Metrics      Metrics
 }
 
 type Metrics struct {
@@ -52,6 +53,6 @@ type EtcdMetrics struct {
 	ResourceUsageMetrics      metric.ResourceUsageMetrics `json:"resource_usage_metrics"`
 }
 
-func NewContext(startTime time.Time) *Context {
-	return &Context{StartTime: startTime}
+func NewContext(clusterNames []string, startTime time.Time) *Context {
+	return &Context{ClusterNames: clusterNames, StartTime: startTime}
 }
