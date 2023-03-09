@@ -174,7 +174,7 @@ func runTests(benchmarkConfig config.TestConfig, benchmarkOutputPath string) {
 				log.Fatal(err)
 			}
 
-			cmd := exec.Command("kbench", "-benchconfig", fmt.Sprintf("../../k-bench-test-configs/%v", benchmarkConfig.TestConfigName), "-outdir", filepath.Join(testOutputPath, clusterConfig.Name))
+			cmd := exec.Command("kbench", "-benchconfig", fmt.Sprintf(benchmarkConfig.TestConfigName), "-outdir", filepath.Join(testOutputPath, clusterConfig.Name))
 			cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)))
 			outfile, err := os.Create(filepath.Join(testOutputPath, clusterConfig.Name, stdoutFileName))
 			if err != nil {
