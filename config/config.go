@@ -20,7 +20,6 @@ type TestConfig struct {
 	ClusterType          ClusterType     `json:"cluster_type"`
 	RootKubeConfigPath   string          `json:"root_kubeconfig_path"`
 	KubeconfigBasePath   string          `json:"kubeconfig_base_path"`
-	RunsBasePath         string          `json:"runs_base_path"`
 	ClusterConfigs       []ClusterConfig `json:"clusters"`
 	ClusterCreateOptions []string        `json:"cluster_create_options"`
 	InitialResources     struct {

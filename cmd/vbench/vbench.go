@@ -9,11 +9,12 @@ import (
 
 const (
 	defaultConfigPath = "./config/default/config.json"
-	defaultOutputPath = "./"
+	defaultOutputPath = "./runs"
 )
 
 func main() {
 	benchmarkConfigPath := flag.String("config", defaultConfigPath, "benchmark config file")
+	benchmarkOutputPath := flag.String("config", defaultOutputPath, "benchmark output path")
 	flag.Parse()
 
 	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(benchmarkConfigPath)
@@ -24,6 +25,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd.RunExperiment(benchmarkConfig, vclusterManager)
+		cmd.RunExperiment(vclusterManager, benchmarkConfig, *benchmarkOutputPath)
 	}
 }

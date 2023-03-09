@@ -85,13 +85,13 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
 	return testConfigs
 }
 
-func RunExperiment(benchmarkConfig config.TestConfig, vclusterManager virtual_cluster.VirtualClusterManager) {
+func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig config.TestConfig, benchmarkOutputPath string) {
 	if benchmarkConfig.ClusterType == "virtual" {
 		vclusterManager.Create(benchmarkConfig)
 	}
 
 	createInitialResources(benchmarkConfig)
-	runTests(benchmarkConfig)
+	runTests(benchmarkConfig, benchmarkOutputPath)
 	cleanupInitialResources(benchmarkConfig)
 
 	if benchmarkConfig.ClusterType == "virtual" {
@@ -127,12 +127,12 @@ func createInitialResources(benchmarkConfig config.TestConfig) {
 	log.Info("Created initial resources.")
 }
 
-func runTests(benchmarkConfig config.TestConfig) {
-	experimentDirName, err := createExperimentDir(benchmarkConfig)
+func runTests(benchmarkConfig config.TestConfig, benchmarkOutputPath string) {
+	experimentDirName, err := createExperimentDir(benchmarkOutputPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	testOutputPath := filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName, benchmarkConfig.Name)
+	testOutputPath := filepath.Join(benchmarkOutputPath, experimentDirName, benchmarkConfig.Name)
 	if err := os.MkdirAll(testOutputPath, os.ModePerm); err != nil {
 		log.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func runTests(benchmarkConfig config.TestConfig) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = copyFile(benchmarkConfig.MetaInfoPath, filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName, metaInfoFileName))
+	_, err = copyFile(benchmarkConfig.MetaInfoPath, filepath.Join(benchmarkOutputPath, experimentDirName, metaInfoFileName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -204,15 +204,15 @@ func runTests(benchmarkConfig config.TestConfig) {
 	log.Info("Finished running tests.")
 }
 
-func createExperimentDir(benchmarkConfig config.TestConfig) (string, error) {
+func createExperimentDir(benchmarkOutputPath string) (string, error) {
 	i := 1
 	currentDate := time.Now().Format("2006_01_02")
 	experimentDirName := fmt.Sprintf("%v_%03d", currentDate, i)
-	exists, _ := isFileOrDirExisting(filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName))
+	exists, _ := isFileOrDirExisting(filepath.Join(benchmarkOutputPath, experimentDirName))
 	for exists && i < maxExperimentsPerDay {
 		i++
 		experimentDirName = fmt.Sprintf("%v_%03d", currentDate, i)
-		exists, _ = isFileOrDirExisting(filepath.Join(benchmarkConfig.RunsBasePath, experimentDirName))
+		exists, _ = isFileOrDirExisting(filepath.Join(benchmarkOutputPath, experimentDirName))
 	}
 
 	if i == maxExperimentsPerDay {
