@@ -4,6 +4,7 @@ import (
 	"flag"
 	log "github.com/sirupsen/logrus"
 	"v-bench/internal/cmd"
+	"v-bench/internal/util"
 	"v-bench/virtual_cluster"
 )
 
@@ -12,12 +13,16 @@ const (
 	defaultOutputPath = "./runs"
 )
 
+func init() {
+	log.SetLevel(log.DebugLevel)
+}
+
 func main() {
 	benchmarkConfigPath := flag.String("config", defaultConfigPath, "benchmark config file")
-	benchmarkOutputPath := flag.String("config", defaultOutputPath, "benchmark output path")
+	benchmarkOutputPath := flag.String("out", defaultOutputPath, "benchmark output path")
 	flag.Parse()
 
-	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(benchmarkConfigPath)
+	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(util.ExpandPath(*benchmarkConfigPath))
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
 	for _, benchmarkConfig := range benchmarkConfigs {
@@ -25,6 +30,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd.RunExperiment(vclusterManager, benchmarkConfig, *benchmarkOutputPath)
+		cmd.RunExperiment(vclusterManager, benchmarkConfig, util.ExpandPath(*benchmarkOutputPath))
 	}
 }

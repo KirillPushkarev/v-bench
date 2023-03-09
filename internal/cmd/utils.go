@@ -24,15 +24,15 @@ const (
 	maxExperimentsPerDay = 1000
 )
 
-func ReadBenchmarkConfigPaths(benchmarkConfigPath *string) []string {
-	benchmarkConfigFileInfo, err := os.Stat(*benchmarkConfigPath)
+func ReadBenchmarkConfigPaths(benchmarkConfigPath string) []string {
+	benchmarkConfigFileInfo, err := os.Stat(benchmarkConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var benchmarkConfigs []string
+	var benchmarkConfigPaths []string
 	if benchmarkConfigFileInfo.Mode().IsDir() {
-		configDir := *benchmarkConfigPath
+		configDir := benchmarkConfigPath
 		f, err := os.Open(configDir)
 		if err != nil {
 			log.Fatal(err)
@@ -48,14 +48,14 @@ func ReadBenchmarkConfigPaths(benchmarkConfigPath *string) []string {
 
 		for _, file := range files {
 			if !file.IsDir() && filepath.Ext(file.Name()) == ".json" {
-				benchmarkConfigs = append(benchmarkConfigs, filepath.Join(configDir, file.Name()))
+				benchmarkConfigPaths = append(benchmarkConfigPaths, filepath.Join(configDir, file.Name()))
 			}
 		}
 	} else {
-		benchmarkConfigs = append(benchmarkConfigs, *benchmarkConfigPath)
+		benchmarkConfigPaths = append(benchmarkConfigPaths, benchmarkConfigPath)
 	}
 
-	return benchmarkConfigs
+	return benchmarkConfigPaths
 }
 
 func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
@@ -73,6 +73,7 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
 		if err != nil {
 			log.Fatalf("Can not parse benchmark config file, error: \n %v \n", err)
 		}
+		testConfig.ExpandPaths()
 
 		testConfigs = append(testConfigs, testConfig)
 

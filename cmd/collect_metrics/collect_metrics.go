@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"time"
 	"v-bench/internal/cmd"
+	"v-bench/internal/util"
 	"v-bench/measurement"
 	"v-bench/reporting"
 	"v-bench/virtual_cluster/monitoring"
@@ -22,11 +23,11 @@ func init() {
 
 func main() {
 	benchmarkConfigPath := flag.String("config", defaultConfigPath, "benchmark config file")
-	outputPath := flag.String("out", defaultOutputPath, "output path")
+	benchmarkOutputPath := flag.String("out", defaultOutputPath, "output path")
 	clusterName := flag.String("cluster", defaultClusterName, "cluster name")
 	flag.Parse()
 
-	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(benchmarkConfigPath)
+	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(util.ExpandPath(*benchmarkConfigPath))
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
 	promProvisioner, err := monitoring.NewPrometheusProvisioner(benchmarkConfigs[0].RootKubeConfigPath)
@@ -46,5 +47,5 @@ func main() {
 	metricCollector.CollectMetrics(measurementContext, cmd.CollectConfigFromTestConfig(benchmarkConfigs[0]))
 
 	reporter := &reporting.JsonReporter{}
-	reporter.Report(*outputPath, measurementContext)
+	reporter.Report(util.ExpandPath(*benchmarkOutputPath), measurementContext)
 }

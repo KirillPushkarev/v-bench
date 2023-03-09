@@ -1,5 +1,9 @@
 package config
 
+import (
+	"v-bench/internal/util"
+)
+
 type ClusterConfig struct {
 	Name                      string `json:"name"`
 	Namespace                 string `json:"namespace"`
@@ -27,4 +31,14 @@ type TestConfig struct {
 	} `json:"initial_resources"`
 	TestConfigName string `json:"test_config"`
 	MetaInfoPath   string `json:"meta_info_file"`
+}
+
+func (testConfig *TestConfig) ExpandPaths() {
+	testConfig.ConfigPath = util.ExpandPath(testConfig.ConfigPath)
+	testConfig.RootKubeConfigPath = util.ExpandPath(testConfig.RootKubeConfigPath)
+	testConfig.KubeconfigBasePath = util.ExpandPath(testConfig.KubeconfigBasePath)
+	for _, clusterConfig := range testConfig.ClusterConfigs {
+		clusterConfig.KubeConfigPath = util.ExpandPath(clusterConfig.KubeConfigPath)
+	}
+	testConfig.MetaInfoPath = util.ExpandPath(testConfig.MetaInfoPath)
 }
