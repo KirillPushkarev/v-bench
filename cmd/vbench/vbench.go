@@ -22,7 +22,9 @@ func main() {
 	benchmarkOutputPath := flag.String("out", defaultOutputPath, "benchmark output path")
 	flag.Parse()
 
-	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(util.ExpandPath(*benchmarkConfigPath))
+	pathExpander := util.StandardPathExpander{}
+
+	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(pathExpander.ExpandPath(*benchmarkConfigPath))
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
 	for _, benchmarkConfig := range benchmarkConfigs {
@@ -30,6 +32,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd.RunExperiment(vclusterManager, benchmarkConfig, util.ExpandPath(*benchmarkOutputPath))
+		cmd.RunExperiment(vclusterManager, benchmarkConfig, pathExpander.ExpandPath(*benchmarkOutputPath))
 	}
 }

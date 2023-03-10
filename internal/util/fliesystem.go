@@ -6,7 +6,21 @@ import (
 	"strings"
 )
 
-func ExpandPath(path string) string {
+type PathExpander interface {
+	ExpandPath(path string) string
+}
+
+type NoOpPathExpander struct {
+}
+
+func (*NoOpPathExpander) ExpandPath(path string) string {
+	return path
+}
+
+type StandardPathExpander struct {
+}
+
+func (*StandardPathExpander) ExpandPath(path string) string {
 	usr, _ := user.Current()
 	homeDir := usr.HomeDir
 

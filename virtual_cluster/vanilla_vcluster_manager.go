@@ -22,9 +22,9 @@ func NewStandardVirtualClusterManager(kubeconfigPath string) (*StandardVirtualCl
 	return &StandardVirtualClusterManager{PrometheusProvisioner: provisioner}, nil
 }
 
-func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfig config.TestConfig) {
+func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfig *config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		createCmdArgs := []string{"create", clusterConfig.Name, "--connect=false"}
+		createCmdArgs := []string{"create", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--connect=false"}
 		createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
 		createCmd := exec.Command("vcluster", createCmdArgs...)
 		stdout, err := createCmd.CombinedOutput()
@@ -33,14 +33,15 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 		}
 		log.Info(string(stdout))
 
-		connectCmd := exec.Command("vcluster", "connect", clusterConfig.Name, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)))
+		connectCmdArgs := []string{"connect", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath))}
+		connectCmd := exec.Command("vcluster", connectCmdArgs...)
 		stdout, err = connectCmd.Output()
 		if err != nil {
 			log.Fatal(err)
 		}
 		log.Info(string(stdout))
 
-		if clusterConfig.ShouldProvisionMonitoring {
+		if benchmarkConfig.ShouldProvisionMonitoring {
 			err = virtualClusterManager.PrometheusProvisioner.Provision(monitoring.NewProvisionerTemplateDto(clusterConfig.Name, clusterConfig.Namespace))
 			if err != nil {
 				log.Fatal(err)
@@ -51,9 +52,9 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 	log.Info("Created virtual clusters.")
 }
 
-func (StandardVirtualClusterManager) Delete(benchmarkConfig config.TestConfig) {
+func (StandardVirtualClusterManager) Delete(benchmarkConfig *config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		cmd := exec.Command("vcluster", "delete", clusterConfig.Name)
+		cmd := exec.Command("vcluster", "delete", clusterConfig.Name, "--namespace", clusterConfig.Namespace)
 		stdout, err := cmd.Output()
 		if err != nil {
 			log.Fatal(err)

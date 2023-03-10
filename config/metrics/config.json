@@ -1,10 +1,10 @@
 {
-  "root_kubeconfig_path": "C:/Users/Kirill/.kube/config",
+  "root_kubeconfig_path": "~/.kube/config",
   "clusters": [
     {
       "name": "vcluster2",
-      "namespace": "vcluster-vcluster2",
-      "should_provision_monitoring": true
+      "namespace": "vcluster-vcluster2"
     }
-  ]
+  ],
+  "should_provision_monitoring": true
 }

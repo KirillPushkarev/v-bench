@@ -27,14 +27,16 @@ func main() {
 	clusterName := flag.String("cluster", defaultClusterName, "cluster name")
 	flag.Parse()
 
-	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(util.ExpandPath(*benchmarkConfigPath))
+	pathExpander := util.StandardPathExpander{}
+
+	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(pathExpander.ExpandPath(*benchmarkConfigPath))
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
 	promProvisioner, err := monitoring.NewPrometheusProvisioner(benchmarkConfigs[0].RootKubeConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if benchmarkConfigs[0].ClusterConfigs[0].ShouldProvisionMonitoring {
+	if benchmarkConfigs[0].ShouldProvisionMonitoring {
 		err := promProvisioner.Provision(monitoring.NewProvisionerTemplateDto(benchmarkConfigs[0].ClusterConfigs[0].Name, benchmarkConfigs[0].ClusterConfigs[0].Namespace))
 		if err != nil {
 			log.Fatal(err)
@@ -47,5 +49,5 @@ func main() {
 	metricCollector.CollectMetrics(measurementContext, cmd.CollectConfigFromTestConfig(benchmarkConfigs[0]))
 
 	reporter := &reporting.JsonReporter{}
-	reporter.Report(util.ExpandPath(*benchmarkOutputPath), measurementContext)
+	reporter.Report(pathExpander.ExpandPath(*benchmarkOutputPath), measurementContext)
 }

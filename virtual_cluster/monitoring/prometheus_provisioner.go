@@ -90,6 +90,7 @@ func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) err
 	if err != nil {
 		return err
 	}
+
 	log.Infof("Finished applying prometheus manifests")
 
 	return nil
@@ -116,7 +117,7 @@ func (receiver PrometheusProvisioner) applyManifest(dto *ProvisionerTemplateDto,
 	}
 
 	log.Debugf("Finished applying prometheus manifest: %s", manifest)
-	log.Debugf("Result: %s", manifest)
+	log.Debugf("Result:")
 	log.Debugf(string(out))
 
 	return nil

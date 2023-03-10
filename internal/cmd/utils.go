@@ -58,8 +58,8 @@ func ReadBenchmarkConfigPaths(benchmarkConfigPath string) []string {
 	return benchmarkConfigPaths
 }
 
-func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
-	var testConfigs []config.TestConfig
+func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []*config.TestConfig {
+	var testConfigs []*config.TestConfig
 
 	for _, benchmarkConfigPath := range benchmarkConfigPaths {
 		configFile, err := os.OpenFile(benchmarkConfigPath, os.O_RDWR, 0666)
@@ -68,12 +68,11 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
 		}
 
 		decoder := json.NewDecoder(configFile)
-		testConfig := config.TestConfig{ConfigPath: benchmarkConfigPath}
+		testConfig := config.NewDefaultTestConfig(benchmarkConfigPath, &util.StandardPathExpander{})
 		err = decoder.Decode(&testConfig)
 		if err != nil {
 			log.Fatalf("Can not parse benchmark config file, error: \n %v \n", err)
 		}
-		testConfig.ExpandPaths()
 
 		testConfigs = append(testConfigs, testConfig)
 
@@ -86,7 +85,7 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []config.TestConfig {
 	return testConfigs
 }
 
-func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig config.TestConfig, benchmarkOutputPath string) {
+func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 	if benchmarkConfig.ClusterType == "virtual" {
 		vclusterManager.Create(benchmarkConfig)
 	}
@@ -100,7 +99,7 @@ func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchm
 	}
 }
 
-func createInitialResources(benchmarkConfig config.TestConfig) {
+func createInitialResources(benchmarkConfig *config.TestConfig) {
 	if benchmarkConfig.InitialResources.ConfigMap == 0 {
 		return
 	}
@@ -128,7 +127,7 @@ func createInitialResources(benchmarkConfig config.TestConfig) {
 	log.Info("Created initial resources.")
 }
 
-func runTests(benchmarkConfig config.TestConfig, benchmarkOutputPath string) {
+func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 	experimentDirName, err := createExperimentDir(benchmarkOutputPath)
 	if err != nil {
 		log.Fatal(err)
@@ -268,7 +267,7 @@ func copyFile(sourcePath, destinationPath string) (bytesWritten int64, err error
 	return nBytes, err
 }
 
-func cleanupInitialResources(benchmarkConfig config.TestConfig) {
+func cleanupInitialResources(benchmarkConfig *config.TestConfig) {
 	if benchmarkConfig.InitialResources.ConfigMap == 0 {
 		return
 	}
@@ -285,7 +284,7 @@ func cleanupInitialResources(benchmarkConfig config.TestConfig) {
 	log.Info("Deleted initial resources.")
 }
 
-func CollectConfigFromTestConfig(testConfig config.TestConfig) *measurement.CollectConfig {
+func CollectConfigFromTestConfig(testConfig *config.TestConfig) *measurement.CollectConfig {
 	if testConfig.ClusterType == config.HostCluster {
 		return measurement.NewCollectConfig(true)
 	}
