@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"v-bench/config"
 	"v-bench/virtual_cluster/monitoring"
 )
@@ -23,31 +24,41 @@ func NewStandardVirtualClusterManager(kubeconfigPath string) (*StandardVirtualCl
 }
 
 func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfig *config.TestConfig) {
+	var wg sync.WaitGroup
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		createCmdArgs := []string{"create", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--connect=false"}
-		createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
-		createCmd := exec.Command("vcluster", createCmdArgs...)
-		stdout, err := createCmd.CombinedOutput()
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Info(string(stdout))
+		clusterConfig := clusterConfig
+		wg.Add(1)
 
-		connectCmdArgs := []string{"connect", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath))}
-		connectCmd := exec.Command("vcluster", connectCmdArgs...)
-		stdout, err = connectCmd.Output()
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Info(string(stdout))
-
-		if benchmarkConfig.ShouldProvisionMonitoring {
-			err = virtualClusterManager.PrometheusProvisioner.Provision(monitoring.NewProvisionerTemplateDto(clusterConfig.Name, clusterConfig.Namespace))
+		go func() {
+			createCmdArgs := []string{"create", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--connect=false"}
+			createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
+			createCmd := exec.Command("vcluster", createCmdArgs...)
+			stdout, err := createCmd.CombinedOutput()
 			if err != nil {
 				log.Fatal(err)
 			}
-		}
+			log.Infof("Cluster %v; create command result: %v", clusterConfig.Name, string(stdout))
+
+			connectCmdArgs := []string{"connect", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath))}
+			connectCmd := exec.Command("vcluster", connectCmdArgs...)
+			stdout, err = connectCmd.Output()
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Infof("Cluster %v; connect command result: %v", clusterConfig.Name, string(stdout))
+
+			if benchmarkConfig.ShouldProvisionMonitoring {
+				err = virtualClusterManager.PrometheusProvisioner.Provision(monitoring.NewProvisionerTemplateDto(clusterConfig.Name, clusterConfig.Namespace))
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+
+			wg.Done()
+		}()
 	}
+
+	wg.Wait()
 
 	log.Info("Created virtual clusters.")
 }

@@ -56,7 +56,7 @@ func NewPrometheusProvisioner(kubeConfigPath string) (*PrometheusProvisioner, er
 }
 
 func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) error {
-	log.Infof("Applying prometheus manifests")
+	log.Infof("Cluster %v; applying prometheus manifests", dto.ClusterName)
 
 	rbacManifests, err := fs.Glob(manifestsFs, rbacManifestsPattern)
 	if err != nil {
@@ -91,13 +91,13 @@ func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) err
 		return err
 	}
 
-	log.Infof("Finished applying prometheus manifests")
+	log.Infof("Cluster %v; finished applying prometheus manifests", dto.ClusterName)
 
 	return nil
 }
 
 func (receiver PrometheusProvisioner) applyManifest(dto *ProvisionerTemplateDto, manifest string) error {
-	log.Debugf("Applying prometheus manifest: %s", manifest)
+	log.Debugf("Cluster %v; applying prometheus manifest: %s", dto.ClusterName, manifest)
 
 	t, err := template.ParseFS(manifestsFs, manifest)
 	if err != nil {
@@ -111,35 +111,32 @@ func (receiver PrometheusProvisioner) applyManifest(dto *ProvisionerTemplateDto,
 
 	cmd := exec.Command("kubectl", "apply", "-f", "-")
 	cmd.Stdin = buffer
-	out, err := cmd.CombinedOutput()
+	_, err = cmd.CombinedOutput()
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("Finished applying prometheus manifest: %s", manifest)
-	log.Debugf("Result:")
-	log.Debugf(string(out))
+	log.Debugf("Cluster %v; finished applying prometheus manifest: %s", dto.ClusterName, manifest)
 
 	return nil
 }
 
 func (receiver PrometheusProvisioner) applyEtcdServicePatch(dto *ProvisionerTemplateDto) error {
-	log.Debugf("Applying prometheus manifest: %s", "kube-prometheus-configs/templates/k8s/patches/etcd-service-patch.yaml")
+	log.Debugf("Cluster %v; applying prometheus manifest: %s", dto.ClusterName, "kube-prometheus-configs/templates/k8s/patches/etcd-service-patch.yaml")
 
 	cmd := exec.Command("kubectl", "patch", "service", "-n", dto.ClusterNamespace, fmt.Sprintf("%v-etcd", dto.ClusterName), "--patch", string(etcdServicePatch))
-	out, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("Finished applying prometheus manifest: %s", "kube-prometheus-configs/templates/k8s/patches/etcd-service-patch.yaml")
-	log.Debugf(string(out))
+	log.Debugf("Cluster %v; finished applying prometheus manifest: %s", dto.ClusterName, "kube-prometheus-configs/templates/k8s/patches/etcd-service-patch.yaml")
 
 	return nil
 }
 
 func (receiver PrometheusProvisioner) waitForPrometheusToBeHealthy(dto *ProvisionerTemplateDto) error {
-	log.Info("Waiting for Prometheus stack to become healthy...")
+	log.Infof("Cluster %v; waiting for Prometheus stack to become healthy...", dto.ClusterName)
 	return wait.PollImmediate(
 		checkPrometheusReadyIntervalInSeconds*time.Second,
 		checkPrometheusReadyTimeoutInSeconds*time.Second,
