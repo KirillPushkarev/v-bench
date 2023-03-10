@@ -5,15 +5,29 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"v-bench/config"
 	"v-bench/measurement"
 )
 
 type JsonReporter struct{}
 
-func (*JsonReporter) Report(outputPath string, measurementContext *measurement.Context) {
-	content, err := json.Marshal(struct {
-		Metrics measurement.Metrics `json:"metrics"`
-	}{Metrics: measurementContext.Metrics})
+type ReportModel struct {
+	Metrics struct {
+		HostCluster     *measurement.Metrics `json:"host_cluster"`
+		VirtualClusters *measurement.Metrics `json:"virtual_clusters"`
+	} `json:"metrics"`
+}
+
+func (*JsonReporter) Report(benchmarkConfig *config.TestConfig, outputPath string, hostMeasurementContext *measurement.Context, virtualMeasurementContext *measurement.Context) {
+	reportModel := ReportModel{Metrics: struct {
+		HostCluster     *measurement.Metrics `json:"host_cluster"`
+		VirtualClusters *measurement.Metrics `json:"virtual_clusters"`
+	}{HostCluster: &hostMeasurementContext.Metrics}}
+	if benchmarkConfig.ClusterType == config.VirtualCluster {
+		reportModel.Metrics.VirtualClusters = &virtualMeasurementContext.Metrics
+	}
+
+	content, err := json.Marshal(reportModel)
 	if err != nil {
 		log.Fatal(err)
 	}

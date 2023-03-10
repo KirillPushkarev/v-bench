@@ -4,17 +4,16 @@ import (
 	"flag"
 	log "github.com/sirupsen/logrus"
 	"time"
+	"v-bench/config"
 	"v-bench/internal/cmd"
 	"v-bench/internal/util"
 	"v-bench/measurement"
 	"v-bench/reporting"
-	"v-bench/virtual_cluster/monitoring"
 )
 
 const (
-	defaultConfigPath  = "./config/metrics/config.json"
-	defaultOutputPath  = "./"
-	defaultClusterName = ""
+	defaultConfigPath = "./config/metrics/config.json"
+	defaultOutputPath = "./"
 )
 
 func init() {
@@ -24,7 +23,6 @@ func init() {
 func main() {
 	benchmarkConfigPath := flag.String("config", defaultConfigPath, "benchmark config file")
 	benchmarkOutputPath := flag.String("out", defaultOutputPath, "output path")
-	clusterName := flag.String("cluster", defaultClusterName, "cluster name")
 	flag.Parse()
 
 	pathExpander := util.StandardPathExpander{}
@@ -32,22 +30,31 @@ func main() {
 	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(pathExpander.ExpandPath(*benchmarkConfigPath))
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
-	promProvisioner, err := monitoring.NewPrometheusProvisioner(benchmarkConfigs[0].RootKubeConfigPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if benchmarkConfigs[0].ShouldProvisionMonitoring {
-		err := promProvisioner.Provision(monitoring.NewProvisionerTemplateDto(benchmarkConfigs[0].ClusterConfigs[0].Name, benchmarkConfigs[0].ClusterConfigs[0].Namespace))
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	benchmarkConfig := benchmarkConfigs[0]
+	collectMetrics(benchmarkConfig, pathExpander.ExpandPath(*benchmarkOutputPath))
+}
 
+func collectMetrics(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 	startTime := time.Now().Add(-5 * time.Minute)
-	measurementContext := measurement.NewContext([]string{*clusterName}, startTime)
-	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfigs[0].RootKubeConfigPath)
-	metricCollector.CollectMetrics(measurementContext, cmd.CollectConfigFromTestConfig(benchmarkConfigs[0]))
+	clusterNames := util.Map(
+		benchmarkConfig.ClusterConfigs,
+		func(clusterConfig config.ClusterConfig) string {
+			return clusterConfig.Name
+		},
+	)
+	hostClusterNames := []string{""}
+	virtualClusterNames := util.Filter(clusterNames, func(clusterName string) bool { return clusterName != "host" })
+	hostMeasurementContext := measurement.NewContext(hostClusterNames, startTime)
+	virtualMeasurementContext := measurement.NewContext(virtualClusterNames, startTime)
+	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfig.RootKubeConfigPath)
+
+	metricCollector.CollectMetrics(hostMeasurementContext, measurement.NewCollectConfig(true))
+	if benchmarkConfig.ClusterType == config.VirtualCluster {
+		metricCollector.CollectMetrics(virtualMeasurementContext, measurement.NewCollectConfig(false))
+	}
 
 	reporter := &reporting.JsonReporter{}
-	reporter.Report(pathExpander.ExpandPath(*benchmarkOutputPath), measurementContext)
+	reporter.Report(benchmarkConfig, benchmarkOutputPath, hostMeasurementContext, virtualMeasurementContext)
+
+	log.Info("Finished collecting metrics.")
 }

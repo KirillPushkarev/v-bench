@@ -153,14 +153,13 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 	clusterNames := util.Map(
 		benchmarkConfig.ClusterConfigs,
 		func(clusterConfig config.ClusterConfig) string {
-			if clusterConfig.Name != "host" {
-				return clusterConfig.Name
-			} else {
-				return ""
-			}
+			return clusterConfig.Name
 		},
 	)
-	measurementContext := measurement.NewContext(clusterNames, startTime)
+	hostClusterNames := []string{""}
+	virtualClusterNames := util.Filter(clusterNames, func(clusterName string) bool { return clusterName != "host" })
+	hostMeasurementContext := measurement.NewContext(hostClusterNames, startTime)
+	virtualMeasurementContext := measurement.NewContext(virtualClusterNames, startTime)
 	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfig.RootKubeConfigPath)
 
 	var wg sync.WaitGroup
@@ -197,9 +196,13 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 
 	wg.Wait()
 
-	metricCollector.CollectMetrics(measurementContext, CollectConfigFromTestConfig(benchmarkConfig))
+	metricCollector.CollectMetrics(hostMeasurementContext, measurement.NewCollectConfig(true))
+	if benchmarkConfig.ClusterType == config.VirtualCluster {
+		metricCollector.CollectMetrics(virtualMeasurementContext, measurement.NewCollectConfig(false))
+	}
+
 	reporter := &reporting.JsonReporter{}
-	reporter.Report(testOutputPath, measurementContext)
+	reporter.Report(benchmarkConfig, testOutputPath, hostMeasurementContext, virtualMeasurementContext)
 
 	log.Info("Finished running tests.")
 }
@@ -282,12 +285,4 @@ func cleanupInitialResources(benchmarkConfig *config.TestConfig) {
 	}
 
 	log.Info("Deleted initial resources.")
-}
-
-func CollectConfigFromTestConfig(testConfig *config.TestConfig) *measurement.CollectConfig {
-	if testConfig.ClusterType == config.HostCluster {
-		return measurement.NewCollectConfig(true)
-	}
-
-	return measurement.NewCollectConfig(false)
 }
