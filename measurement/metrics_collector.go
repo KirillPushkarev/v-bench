@@ -44,7 +44,7 @@ const (
 	controllerManagerRateResolution              = goProcessRateResolution
 	controllerManagerCommonFilters               = `%v=~"%v", job="kube-controller-manager"`
 
-	schedulerSchedulingLatencyQuery     = "histogram_quantile(%.2f, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{%v}[%v])))"
+	schedulerSchedulingLatencyQuery     = "histogram_quantile(%.2f, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{%v}[%v])) by (le))"
 	schedulerSchedulingThroughputQuery  = "quantile_over_time(%.2f, avg(rate(scheduler_scheduling_algorithm_duration_seconds_count{%v}[%v]))[%v:%v])"
 	schedulerToApiServerLatencyQuery    = "histogram_quantile(%.2f, sum(rate(rest_client_request_duration_seconds_bucket{%v}[%v])) by (verb, le))"
 	schedulerToApiServerThroughputQuery = "quantile_over_time(%.2f, avg(rate(rest_client_requests_total{%v}[%v])) by (method)[%v:%v])"
