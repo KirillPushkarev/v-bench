@@ -314,47 +314,48 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 func (mc *MetricCollector) collectSchedulerMetrics(context *Context, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
 	schedulerMetrics := &context.Metrics.SchedulerMetrics
 
-	var schedulingThroughputSamples []*model.Sample
-	for _, q := range quantiles {
-		query := fmt.Sprintf(schedulerSchedulingThroughputQuery, q, filters.SchedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
-		if err != nil {
-			logQueryExecutionError(err, query)
-			continue
-		}
-
-		for _, sample := range samples {
-			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
-		}
-		schedulingThroughputSamples = append(schedulingThroughputSamples, samples...)
-	}
-	schedulingThroughputStatistics, err := metricStatisticsFromSamples[float64](schedulingThroughputSamples, rateConverter)
-	if err != nil {
-		log.Errorf("prometheus metrics parsing error: %v", err)
-	} else {
-		schedulerMetrics.SchedulingThroughput = *schedulingThroughputStatistics
-	}
-
-	var schedulingLatencySamples []*model.Sample
-	for _, q := range quantiles {
-		query := fmt.Sprintf(schedulerSchedulingLatencyQuery, q, filters.SchedulerCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
-		if err != nil {
-			logQueryExecutionError(err, query)
-			continue
-		}
-
-		for _, sample := range samples {
-			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
-		}
-		schedulingLatencySamples = append(schedulingLatencySamples, samples...)
-	}
-	schedulingLatencyStatistics, err := metricStatisticsFromSamples[float64](schedulingLatencySamples, durationConverter)
-	if err != nil {
-		log.Errorf("prometheus metrics parsing error: %v", err)
-	} else {
-		schedulerMetrics.SchedulingLatency = *schedulingLatencyStatistics
-	}
+	// TODO: разобраться, почему этих рядов нет в некоторых версиях k8s
+	//var schedulingThroughputSamples []*model.Sample
+	//for _, q := range quantiles {
+	//	query := fmt.Sprintf(schedulerSchedulingThroughputQuery, q, filters.SchedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
+	//	samples, err := mc.executor.Query(query, endTime)
+	//	if err != nil {
+	//		logQueryExecutionError(err, query)
+	//		continue
+	//	}
+	//
+	//	for _, sample := range samples {
+	//		sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+	//	}
+	//	schedulingThroughputSamples = append(schedulingThroughputSamples, samples...)
+	//}
+	//schedulingThroughputStatistics, err := metricStatisticsFromSamples[float64](schedulingThroughputSamples, rateConverter)
+	//if err != nil {
+	//	log.Errorf("prometheus metrics parsing error: %v", err)
+	//} else {
+	//	schedulerMetrics.SchedulingThroughput = *schedulingThroughputStatistics
+	//}
+	//
+	//var schedulingLatencySamples []*model.Sample
+	//for _, q := range quantiles {
+	//	query := fmt.Sprintf(schedulerSchedulingLatencyQuery, q, filters.SchedulerCommonFilters, durationInPromFormat)
+	//	samples, err := mc.executor.Query(query, endTime)
+	//	if err != nil {
+	//		logQueryExecutionError(err, query)
+	//		continue
+	//	}
+	//
+	//	for _, sample := range samples {
+	//		sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+	//	}
+	//	schedulingLatencySamples = append(schedulingLatencySamples, samples...)
+	//}
+	//schedulingLatencyStatistics, err := metricStatisticsFromSamples[float64](schedulingLatencySamples, durationConverter)
+	//if err != nil {
+	//	log.Errorf("prometheus metrics parsing error: %v", err)
+	//} else {
+	//	schedulerMetrics.SchedulingLatency = *schedulingLatencyStatistics
+	//}
 
 	var apiServerThroughputSamples []*model.Sample
 	for _, q := range quantiles {
