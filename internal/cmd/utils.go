@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +25,11 @@ const (
 	metaInfoFileName     = "system_info.yaml"
 	stdoutFileName       = "stdout.log"
 	maxExperimentsPerDay = 1000
+)
+
+var (
+	//go:embed templates/configmap-1m.yaml
+	configMap1mConfig []byte
 )
 
 func ReadBenchmarkConfigPaths(benchmarkConfigPath string) []string {
@@ -119,20 +125,19 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		kubeconfigPath := filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)
 		createNamespaceCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespaces", "initial")
-		stdout, err := createNamespaceCmd.Output()
+		stdoutStderr, err := createNamespaceCmd.CombinedOutput()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Cluster %v; error on creating namespace for initial resources: %e, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 		}
-		log.Info(string(stdout))
 
 		for i := 0; i < benchmarkConfig.InitialResources.ConfigMap; i++ {
-			createConfigMapCmdShellCommand := fmt.Sprintf("sed \"s/{{configmap-name}}/configmap-%v/g\" ../../k8s-specs/prepopulate/configmap-1m.yaml | kubectl --kubeconfig=%v create -f -;", i, kubeconfigPath)
-			createConfigMapCmd := exec.Command("bash", "-c", createConfigMapCmdShellCommand)
-			stdout, err := createConfigMapCmd.Output()
-			if err != nil {
-				log.Fatal(err)
+			data := struct{ Name string }{
+				Name: clusterConfig.Name,
 			}
-			log.Info(string(stdout))
+			err := k8s.ApplyManifest(&clusterConfig, "configMap1mConfig", string(configMap1mConfig), data)
+			if err != nil {
+				log.Fatal("Cluster %v; can't create ConfigMap. Error: %v", clusterConfig.Name, err)
+			}
 		}
 	}
 
@@ -288,12 +293,12 @@ func cleanupInitialResources(benchmarkConfig *config.TestConfig) {
 	}
 
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
-		cmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)), "delete", "namespaces", "initial")
-		stdout, err := cmd.Output()
+		kubeconfigPath := filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)
+		cmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "delete", "namespace", "initial")
+		stdoutStderr, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Cluster %v; error on deleting initial resources: %e, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 		}
-		log.Info(string(stdout))
 	}
 
 	log.Info("Deleted initial resources.")

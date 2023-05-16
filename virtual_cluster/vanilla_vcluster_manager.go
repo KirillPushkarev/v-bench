@@ -1,7 +1,6 @@
 package virtual_cluster
 
 import (
-	"bytes"
 	_ "embed"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"text/template"
 	"v-bench/config"
+	"v-bench/k8s"
 	"v-bench/measurement"
 	"v-bench/virtual_cluster/monitoring"
 )
@@ -164,7 +164,7 @@ func (virtualClusterManager StandardVirtualClusterManager) createNamespace(clust
 	data := TemplateDto{
 		ClusterNamespace: clusterConfig.Namespace,
 	}
-	err := virtualClusterManager.applyManifest(clusterConfig, "namespaceConfig", string(namespaceConfig), data)
+	err := k8s.ApplyManifest(clusterConfig, "namespaceConfig", string(namespaceConfig), data)
 	if err != nil {
 		log.Fatal("Cluster %v; can't create Namespace. Error: %v", clusterConfig.Name, err)
 	}
@@ -176,33 +176,8 @@ func (virtualClusterManager StandardVirtualClusterManager) createIngress(benchma
 		ClusterNamespace: clusterConfig.Namespace,
 		IngressDomain:    benchmarkConfig.IngressDomain,
 	}
-	err := virtualClusterManager.applyManifest(clusterConfig, "ingressConfig", string(ingressConfig), data)
+	err := k8s.ApplyManifest(clusterConfig, "ingressConfig", string(ingressConfig), data)
 	if err != nil {
 		log.Fatal("Cluster %v; can't create Ingress. Error: %v", clusterConfig.Name, err)
 	}
-}
-
-func (virtualClusterManager StandardVirtualClusterManager) applyManifest(clusterConfig *config.ClusterConfig, manifestName string, manifest string, data any) error {
-	log.Debugf("Cluster %v; applying manifest: %s", clusterConfig.Name, manifestName)
-
-	t, err := template.New(manifestName).Parse(manifest)
-	if err != nil {
-		return err
-	}
-	buffer := new(bytes.Buffer)
-	err = t.Execute(buffer, data)
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
-	cmd.Stdin = buffer
-	stdoutStderr, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Fatal("Cluster %v; error on applying manifest: %e, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
-	}
-
-	log.Debugf("Cluster %v; finished applying manifest: %s", clusterConfig.Name, manifestName)
-
-	return nil
 }
