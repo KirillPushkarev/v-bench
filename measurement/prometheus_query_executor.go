@@ -9,7 +9,7 @@ import (
 	"math"
 	"time"
 	"v-bench/measurement/util"
-	"v-bench/prometheus/clients"
+	"v-bench/prometheus"
 )
 
 const (
@@ -19,11 +19,10 @@ const (
 
 // PrometheusQueryExecutor executes queries against Prometheus.
 type PrometheusQueryExecutor struct {
-	client clients.Client
+	client prometheus.Client
 }
 
-// NewPrometheusQueryExecutor creates instance of PrometheusQueryExecutor.
-func NewPrometheusQueryExecutor(pc clients.Client) *PrometheusQueryExecutor {
+func NewPrometheusQueryExecutor(pc prometheus.Client) *PrometheusQueryExecutor {
 	return &PrometheusQueryExecutor{client: pc}
 }
 
@@ -40,7 +39,7 @@ func (e *PrometheusQueryExecutor) Query(query string, queryTime time.Time) ([]*m
 	if err := wait.PollImmediate(queryInterval, queryTimeout, func() (bool, error) {
 		body, queryErr = e.client.Query(query, queryTime)
 		if queryErr != nil {
-			return false, nil
+			return false, queryErr
 		}
 		return true, nil
 	}); err != nil {
@@ -69,14 +68,13 @@ func (e *PrometheusQueryExecutor) Query(query string, queryTime time.Time) ([]*m
 	return resultSamples, nil
 }
 
-func (e *PrometheusQueryExecutor) Targets(params map[string]string) ([]v1.ActiveTarget, error) {
+func (e *PrometheusQueryExecutor) Targets(state string) ([]v1.ActiveTarget, error) {
 	var body []byte
 	var queryErr error
 
 	log.Debugf("Executing query for retrieving targets")
-
 	if err := wait.PollImmediate(queryInterval, queryTimeout, func() (bool, error) {
-		body, queryErr = e.client.Targets(params)
+		body, queryErr = e.client.Targets(state)
 		if queryErr != nil {
 			return false, nil
 		}

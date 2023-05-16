@@ -13,7 +13,9 @@ import (
 	"time"
 	"v-bench/config"
 	"v-bench/internal/util"
+	"v-bench/k8s"
 	"v-bench/measurement"
+	"v-bench/prometheus"
 	"v-bench/reporting"
 	"v-bench/virtual_cluster"
 )
@@ -85,13 +87,23 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []*config.TestConfig {
 	return testConfigs
 }
 
-func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
+func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *measurement.PrometheusQueryExecutor) {
+	k8sFrameworkForPrometheus, err := k8s.NewFramework(benchmarkConfig.RootKubeConfigPath, 1)
+	if err != nil {
+		log.Fatal("k8s framework creation error: %v", err)
+	}
+	prometheusClient := prometheus.NewInClusterClient(benchmarkConfig.PrometheusConnType, k8sFrameworkForPrometheus.GetClients().GetClient())
+	prometheusQueryExecutor := measurement.NewPrometheusQueryExecutor(prometheusClient)
+	return err, prometheusQueryExecutor
+}
+
+func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
 	if benchmarkConfig.ClusterType == "virtual" {
 		vclusterManager.Create(benchmarkConfig)
 	}
 
 	createInitialResources(benchmarkConfig)
-	runTests(benchmarkConfig, benchmarkOutputPath)
+	runTests(benchmarkConfig, benchmarkOutputPath, prometheusQueryExecutor)
 	cleanupInitialResources(benchmarkConfig)
 
 	if benchmarkConfig.ClusterType == "virtual" {
@@ -127,7 +139,7 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 	log.Info("Created initial resources.")
 }
 
-func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
+func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
 	experimentDirName, err := createExperimentDir(benchmarkOutputPath)
 	if err != nil {
 		log.Fatal(err)
@@ -160,7 +172,7 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 	virtualClusterNames := util.Filter(clusterNames, func(clusterName string) bool { return clusterName != "host" })
 	hostMeasurementContext := measurement.NewContext(hostClusterNames, startTime)
 	virtualMeasurementContext := measurement.NewContext(virtualClusterNames, startTime)
-	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfig.RootKubeConfigPath)
+	metricCollector := measurement.NewMetricCollector(prometheusQueryExecutor)
 
 	var wg sync.WaitGroup
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
@@ -197,7 +209,7 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string) {
 	wg.Wait()
 
 	metricCollector.CollectMetrics(hostMeasurementContext, measurement.NewCollectConfig(true))
-	if benchmarkConfig.ClusterType == config.VirtualCluster {
+	if benchmarkConfig.ClusterType == config.ClusterTypeVirtual {
 		metricCollector.CollectMetrics(virtualMeasurementContext, measurement.NewCollectConfig(false))
 	}
 

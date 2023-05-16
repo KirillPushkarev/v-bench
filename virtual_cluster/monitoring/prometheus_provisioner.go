@@ -11,9 +11,7 @@ import (
 	"text/template"
 	"time"
 	"v-bench/internal/util"
-	"v-bench/k8s"
 	"v-bench/measurement"
-	"v-bench/prometheus/clients"
 )
 
 const (
@@ -41,18 +39,11 @@ func NewProvisionerTemplateDto(clusterName string, clusterNamespace string) *Pro
 }
 
 type PrometheusProvisioner struct {
-	executor *measurement.PrometheusQueryExecutor
+	prometheusQueryExecutor *measurement.PrometheusQueryExecutor
 }
 
-func NewPrometheusProvisioner(kubeConfigPath string) (*PrometheusProvisioner, error) {
-	prometheusFramework, err := k8s.NewFramework(kubeConfigPath, numK8sClients)
-	if err != nil {
-		return nil, fmt.Errorf("k8s framework creation error: %v", err)
-	}
-	pc := clients.NewInClusterPrometheusClient(prometheusFramework.GetClientSets().GetClient())
-	executor := measurement.NewPrometheusQueryExecutor(pc)
-
-	return &PrometheusProvisioner{executor: executor}, nil
+func NewPrometheusProvisioner(prometheusQueryExecutor *measurement.PrometheusQueryExecutor) *PrometheusProvisioner {
+	return &PrometheusProvisioner{prometheusQueryExecutor: prometheusQueryExecutor}
 }
 
 func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) error {
@@ -151,7 +142,7 @@ func (receiver PrometheusProvisioner) isPrometheusReady(dto *ProvisionerTemplate
 		fmt.Sprintf("serviceMonitor/%v/kube-controller-manager/0", dto.ClusterNamespace),
 		fmt.Sprintf("serviceMonitor/%v/etcd/0", dto.ClusterNamespace),
 	}
-	activeTargets, err := receiver.executor.Targets(map[string]string{"state": "active"})
+	activeTargets, err := receiver.prometheusQueryExecutor.Targets("active")
 	if err != nil {
 		return false, err
 	}

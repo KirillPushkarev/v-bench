@@ -10,6 +10,7 @@ func TestTestConfig_UnmarshalJSON(t *testing.T) {
 	type args struct {
 		data []byte
 	}
+	pathExpander := &util.NoOpPathExpander{}
 	tests := []struct {
 		name       string
 		testConfig *TestConfig
@@ -18,7 +19,7 @@ func TestTestConfig_UnmarshalJSON(t *testing.T) {
 	}{
 		{
 			name:       "Test case #1",
-			testConfig: &TestConfig{ConfigPath: "./config.json", RootKubeConfigPath: "~/.kube/config", ShouldProvisionMonitoring: true, PathExpander: &util.NoOpPathExpander{}},
+			testConfig: &TestConfig{ConfigPath: "./config.json", RootKubeConfigPath: "~/.kube/config", ShouldProvisionMonitoring: true, PathExpander: pathExpander},
 			args: args{data: []byte(
 				`{
 				  "name": "v.1.e.s.12.0",
@@ -39,7 +40,7 @@ func TestTestConfig_UnmarshalJSON(t *testing.T) {
 					"configmap": 0
 				  },
 				  "test_config": "./k-bench-test-configs/cp_heavy_12client_test",
-				  "meta_info_file": "./system-info/local_system_info.yaml"
+				  "meta_info_path": "./system-info/local_system_info.yaml"
 				}`),
 			},
 			want: &TestConfig{
@@ -56,6 +57,7 @@ func TestTestConfig_UnmarshalJSON(t *testing.T) {
 				TestConfigName:            "./k-bench-test-configs/cp_heavy_12client_test",
 				MetaInfoPath:              "./system-info/local_system_info.yaml",
 				ShouldProvisionMonitoring: true,
+				PathExpander:              pathExpander,
 			},
 		},
 	}
@@ -65,8 +67,6 @@ func TestTestConfig_UnmarshalJSON(t *testing.T) {
 			err := test.testConfig.UnmarshalJSON(test.args.data)
 
 			assert.Nil(t, err)
-
-			test.testConfig.PathExpander = nil
 			assert.Equal(t, test.want, test.testConfig)
 		})
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clients
+package prometheus
 
 import (
 	"time"
@@ -26,5 +26,5 @@ type Client interface {
 	// in the URL's query string set using the provided arguments.
 	Query(query string, queryTime time.Time) ([]byte, error)
 
-	Targets(params map[string]string) ([]byte, error)
+	Targets(state string) ([]byte, error)
 }

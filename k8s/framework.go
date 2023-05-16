@@ -25,7 +25,7 @@ import (
 
 // Framework allows for interacting with Kubernetes cluster via official Kubernetes clients.
 type Framework struct {
-	clientSets     *MultiClientSet
+	clients        *MultiClientSet
 	dynamicClients *MultiDynamicClient
 }
 
@@ -33,18 +33,18 @@ func NewFramework(kubeConfigPath string, clientsNumber int) (*Framework, error) 
 	log.Infof("Creating framework with %d clients and %q kubeconfig.", clientsNumber, kubeConfigPath)
 	var err error
 	f := Framework{}
-	if f.clientSets, err = NewMultiClientSet(kubeConfigPath, clientsNumber); err != nil {
-		return nil, fmt.Errorf("multi clients set creation error: %v", err)
+	if f.clients, err = NewMultiClientSet(kubeConfigPath, clientsNumber); err != nil {
+		return nil, fmt.Errorf("clients creation error: %v", err)
 	}
 	if f.dynamicClients, err = NewMultiDynamicClient(kubeConfigPath, clientsNumber); err != nil {
-		return nil, fmt.Errorf("multi dynamic clients creation error: %v", err)
+		return nil, fmt.Errorf("dynamic clients creation error: %v", err)
 	}
 
 	return &f, nil
 }
 
-func (f *Framework) GetClientSets() *MultiClientSet {
-	return f.clientSets
+func (f *Framework) GetClients() *MultiClientSet {
+	return f.clients
 }
 
 func (f *Framework) GetDynamicClients() *MultiDynamicClient {

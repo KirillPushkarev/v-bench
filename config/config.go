@@ -15,11 +15,26 @@ type ClusterConfig struct {
 type ClusterType string
 
 const (
-	HostCluster    ClusterType = "host"
-	VirtualCluster ClusterType = "virtual"
+	ClusterTypeHost    ClusterType = "host"
+	ClusterTypeVirtual ClusterType = "virtual"
+)
+
+type VirtualClusterConnType string
+
+const (
+	VirtualClusterConnTypeDirect  VirtualClusterConnType = "direct"
+	VirtualClusterConnTypeIngress VirtualClusterConnType = "ingress"
+)
+
+type PrometheusConnType string
+
+const (
+	PrometheusConnTypeDirect PrometheusConnType = "direct"
+	PrometheusConnTypeProxy  PrometheusConnType = "proxy"
 )
 
 type TestConfig struct {
+	// User supplied fields
 	ConfigPath           string          `json:"config_path"`
 	Name                 string          `json:"name"`
 	ClusterType          ClusterType     `json:"cluster_type"`
@@ -30,14 +45,26 @@ type TestConfig struct {
 	InitialResources     struct {
 		ConfigMap int `json:"configmap"`
 	} `json:"initial_resources"`
-	TestConfigName            string `json:"test_config"`
-	MetaInfoPath              string `json:"meta_info_file"`
-	ShouldProvisionMonitoring bool   `json:"should_provision_monitoring"`
-	PathExpander              util.PathExpander
+	TestConfigName            string                 `json:"test_config"`
+	MetaInfoPath              string                 `json:"meta_info_path"`
+	ShouldProvisionMonitoring bool                   `json:"should_provision_monitoring"`
+	PrometheusConnType        PrometheusConnType     `json:"prometheus_conn_type"`
+	VirtualClusterConnType    VirtualClusterConnType `json:"vcluster_conn_type"`
+	IngressDomain             string                 `json:"ingress_domain"`
+
+	// Other fields
+	PathExpander util.PathExpander
 }
 
 func NewDefaultTestConfig(configPath string, expander util.PathExpander) *TestConfig {
-	return &TestConfig{ConfigPath: configPath, RootKubeConfigPath: "~/.kube/config", ShouldProvisionMonitoring: true, PathExpander: expander}
+	return &TestConfig{
+		ConfigPath:                configPath,
+		RootKubeConfigPath:        "~/.kube/config",
+		ShouldProvisionMonitoring: true,
+		PrometheusConnType:        PrometheusConnTypeProxy,
+		VirtualClusterConnType:    VirtualClusterConnTypeDirect,
+		PathExpander:              expander,
+	}
 }
 
 func (testConfig *TestConfig) UnmarshalJSON(data []byte) error {

@@ -1,8 +1,9 @@
 {
-  "root_kubeconfig_path": "~/.kube/config",
+  "root_kubeconfig_path": "~/Downloads/kubeconfig-vcluster.yaml",
   "clusters": [
     {
-      "name": "host"
+      "name": "host",
+      "kubeconfig": "kubeconfig-vcluster.yaml"
     }
   ]
 }

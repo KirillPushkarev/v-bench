@@ -23,7 +23,7 @@ func (*JsonReporter) Report(benchmarkConfig *config.TestConfig, outputPath strin
 		HostCluster     *measurement.Metrics `json:"host_cluster"`
 		VirtualClusters *measurement.Metrics `json:"virtual_clusters"`
 	}{HostCluster: &hostMeasurementContext.Metrics}}
-	if benchmarkConfig.ClusterType == config.VirtualCluster {
+	if benchmarkConfig.ClusterType == config.ClusterTypeVirtual {
 		reportModel.Metrics.VirtualClusters = &virtualMeasurementContext.Metrics
 	}
 

@@ -8,10 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"v-bench/k8s"
 	"v-bench/measurement/metric"
 	measurementutil "v-bench/measurement/util"
-	"v-bench/prometheus/clients"
 )
 
 const (
@@ -88,18 +86,11 @@ func NewCollectConfig(shouldCollectScheduler bool) *CollectConfig {
 }
 
 type MetricCollector struct {
-	executor *PrometheusQueryExecutor
+	prometheusQueryExecutor *PrometheusQueryExecutor
 }
 
-func NewMetricCollector(kubeConfigPath string) (*MetricCollector, error) {
-	prometheusFramework, err := k8s.NewFramework(kubeConfigPath, numK8sClients)
-	if err != nil {
-		return nil, fmt.Errorf("k8s framework creation error: %v", err)
-	}
-	pc := clients.NewInClusterPrometheusClient(prometheusFramework.GetClientSets().GetClient())
-	executor := NewPrometheusQueryExecutor(pc)
-
-	return &MetricCollector{executor: executor}, nil
+func NewMetricCollector(prometheusQueryExecutor *PrometheusQueryExecutor) *MetricCollector {
+	return &MetricCollector{prometheusQueryExecutor: prometheusQueryExecutor}
 }
 
 type MetricFilters struct {
@@ -129,7 +120,7 @@ func (mc *MetricCollector) CollectMetrics(context *Context, collectConfig *Colle
 		mc.collectSchedulerMetrics(context, metricFilters, endTime, durationInPromFormat)
 	}
 	mc.collectEtcdMetrics(context, metricFilters, endTime, durationInPromFormat)
-	//collectOverallControlPlaneMetrics(durationInPromFormat, executor, endTime, err, context)
+	//collectOverallControlPlaneMetrics(durationInPromFormat, prometheusQueryExecutor, endTime, err, context)
 }
 
 func (mc *MetricCollector) collectApiServerMetrics(context *Context, filters MetricFilters, endTime time.Time, durationInPromFormat string) {
@@ -138,7 +129,7 @@ func (mc *MetricCollector) collectApiServerMetrics(context *Context, filters Met
 	var throughputSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(apiServerThroughputQuery, q, filters.ApiServerApiCallFilters, apiServerRateEvaluationRange, durationInPromFormat, apiServerRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -153,7 +144,7 @@ func (mc *MetricCollector) collectApiServerMetrics(context *Context, filters Met
 	var latencySamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(apiServerLatencyQuery, q, filters.ApiServerApiCallFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -186,7 +177,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 	var queueDepthSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(controllerManagerWorkQueueDepthQuery, q, filters.ControllerManagerCommonFilters, controllerManagerRateEvaluationRange, durationInPromFormat, controllerManagerRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -210,7 +201,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 	var queueAddSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(controllerManagerWorkQueueAddsQuery, q, filters.ControllerManagerCommonFilters, controllerManagerRateEvaluationRange, durationInPromFormat, controllerManagerRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -231,7 +222,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 	var queueQueueDurationSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(controllerManagerWorkQueueQueueDurationQuery, q, filters.ControllerManagerCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -252,7 +243,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 	var queueWorkDurationSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(controllerManagerWorkQueueWorkDurationQuery, q, filters.ControllerManagerCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -273,7 +264,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 	var apiServerThroughputSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(controllerManagerToApiServerThroughputQuery, q, filters.ControllerManagerCommonFilters, controllerManagerRateEvaluationRange, durationInPromFormat, controllerManagerRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -288,7 +279,7 @@ func (mc *MetricCollector) collectControllerManagerMetrics(context *Context, fil
 	var apiServerLatencySamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(controllerManagerToApiServerLatencyQuery, q, filters.ControllerManagerCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -318,7 +309,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, filters Met
 	//var schedulingThroughputSamples []*model.Sample
 	//for _, q := range quantiles {
 	//	query := fmt.Sprintf(schedulerSchedulingThroughputQuery, q, filters.SchedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
-	//	samples, err := mc.executor.Query(query, endTime)
+	//	samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 	//	if err != nil {
 	//		logQueryExecutionError(err, query)
 	//		continue
@@ -339,7 +330,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, filters Met
 	//var schedulingLatencySamples []*model.Sample
 	//for _, q := range quantiles {
 	//	query := fmt.Sprintf(schedulerSchedulingLatencyQuery, q, filters.SchedulerCommonFilters, durationInPromFormat)
-	//	samples, err := mc.executor.Query(query, endTime)
+	//	samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 	//	if err != nil {
 	//		logQueryExecutionError(err, query)
 	//		continue
@@ -360,7 +351,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, filters Met
 	var apiServerThroughputSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(schedulerToApiServerThroughputQuery, q, filters.SchedulerCommonFilters, schedulerRateEvaluationRange, durationInPromFormat, schedulerRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -375,7 +366,7 @@ func (mc *MetricCollector) collectSchedulerMetrics(context *Context, filters Met
 	var apiServerLatencySamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(schedulerToApiServerLatencyQuery, q, filters.SchedulerCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -402,7 +393,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFi
 	etcdMetrics := &context.Metrics.EtcdMetrics
 
 	leaderElectionsQuery := fmt.Sprintf(etcdLeaderElectionsQuery, filters.EtcdCommonFilters, durationInPromFormat)
-	leaderElectionsSamples, err := mc.executor.Query(leaderElectionsQuery, endTime)
+	leaderElectionsSamples, err := mc.prometheusQueryExecutor.Query(leaderElectionsQuery, endTime)
 	if err != nil {
 		logQueryExecutionError(err, leaderElectionsQuery)
 	} else {
@@ -412,7 +403,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFi
 	var dbSizeSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(etcdDbSizeQuery, q, filters.EtcdCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -433,7 +424,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFi
 	var walSyncSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(etcdWalSyncQuery, q, filters.EtcdCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -454,7 +445,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFi
 	var backendCommitSyncSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(etcdBackendCommitSyncQuery, q, filters.EtcdCommonFilters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 			continue
@@ -497,7 +488,7 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFi
 
 func (mc *MetricCollector) queryForProposals(query string, filters MetricFilters, durationInPromFormat string, endTime time.Time) ([]*model.Sample, error) {
 	proposalsCommittedQuery := fmt.Sprintf(query, filters.EtcdCommonFilters, durationInPromFormat)
-	proposalsCommittedSamples, err := mc.executor.Query(proposalsCommittedQuery, endTime)
+	proposalsCommittedSamples, err := mc.prometheusQueryExecutor.Query(proposalsCommittedQuery, endTime)
 	if err != nil {
 		logQueryExecutionError(err, proposalsCommittedQuery)
 		return nil, err
@@ -591,7 +582,7 @@ func (mc *MetricCollector) queryForResourceUsage(filters string, durationInPromF
 	var cpuSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(goProcessCpuQuery, q, filters, goProcessRateEvaluationRange, durationInPromFormat, goProcessRateResolution)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 		}
@@ -604,7 +595,7 @@ func (mc *MetricCollector) queryForResourceUsage(filters string, durationInPromF
 	var memorySamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(goProcessMemoryQuery, q, filters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 		}
@@ -617,7 +608,7 @@ func (mc *MetricCollector) queryForResourceUsage(filters string, durationInPromF
 	var threadSamples []*model.Sample
 	for _, q := range quantiles {
 		query := fmt.Sprintf(goProcessThreadQuery, q, filters, durationInPromFormat)
-		samples, err := mc.executor.Query(query, endTime)
+		samples, err := mc.prometheusQueryExecutor.Query(query, endTime)
 		if err != nil {
 			logQueryExecutionError(err, query)
 		}

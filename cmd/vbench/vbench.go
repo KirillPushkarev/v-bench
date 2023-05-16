@@ -28,10 +28,16 @@ func main() {
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
 	for _, benchmarkConfig := range benchmarkConfigs {
-		vclusterManager, err := virtual_cluster.NewStandardVirtualClusterManager(benchmarkConfig.RootKubeConfigPath)
+		err, prometheusQueryExecutor := cmd.CreatePrometheusQueryExecutor(benchmarkConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd.RunExperiment(vclusterManager, benchmarkConfig, pathExpander.ExpandPath(*benchmarkOutputPath))
+
+		vclusterManager, err := virtual_cluster.NewStandardVirtualClusterManager(prometheusQueryExecutor)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cmd.RunExperiment(vclusterManager, benchmarkConfig, pathExpander.ExpandPath(*benchmarkOutputPath), prometheusQueryExecutor)
 	}
 }

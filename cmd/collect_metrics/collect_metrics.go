@@ -46,10 +46,14 @@ func collectMetrics(benchmarkConfig *config.TestConfig, benchmarkOutputPath stri
 	virtualClusterNames := util.Filter(clusterNames, func(clusterName string) bool { return clusterName != "host" })
 	hostMeasurementContext := measurement.NewContext(hostClusterNames, startTime)
 	virtualMeasurementContext := measurement.NewContext(virtualClusterNames, startTime)
-	metricCollector, _ := measurement.NewMetricCollector(benchmarkConfig.RootKubeConfigPath)
+	err, prometheusQueryExecutor := cmd.CreatePrometheusQueryExecutor(benchmarkConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	metricCollector := measurement.NewMetricCollector(prometheusQueryExecutor)
 
 	metricCollector.CollectMetrics(hostMeasurementContext, measurement.NewCollectConfig(true))
-	if benchmarkConfig.ClusterType == config.VirtualCluster {
+	if benchmarkConfig.ClusterType == config.ClusterTypeVirtual {
 		metricCollector.CollectMetrics(virtualMeasurementContext, measurement.NewCollectConfig(false))
 	}
 
