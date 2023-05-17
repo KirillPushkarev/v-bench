@@ -58,14 +58,14 @@ func (receiver PrometheusProvisioner) Provision(kubeconfigPath string, dto *Prov
 	}
 
 	for _, manifest := range rbacManifests {
-		err := k8s.ApplyManifest(k8s.RootCluster, kubeconfigPath, "rbac", manifest, dto)
+		err := k8s.ApplyManifestFromEmbeddedFile(k8s.RootCluster, kubeconfigPath, manifestsFs, manifest, dto)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, manifest := range monitoringManifests {
-		err := k8s.ApplyManifest(k8s.RootCluster, kubeconfigPath, "monitoring", manifest, dto)
+		err := k8s.ApplyManifestFromEmbeddedFile(k8s.RootCluster, kubeconfigPath, manifestsFs, manifest, dto)
 		if err != nil {
 			return err
 		}

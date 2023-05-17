@@ -168,7 +168,7 @@ func (virtualClusterManager StandardVirtualClusterManager) createNamespace(bench
 	data := TemplateDto{
 		ClusterNamespace: clusterConfig.Namespace,
 	}
-	err := k8s.ApplyManifest(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "namespaceConfig", string(namespaceConfig), data)
+	err := k8s.ApplyManifestFromString(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "namespaceConfig", string(namespaceConfig), data)
 	if err != nil {
 		log.Fatalf("Cluster %v; can't create Namespace. Error: %v", clusterConfig.Name, err)
 	}
@@ -180,7 +180,7 @@ func (virtualClusterManager StandardVirtualClusterManager) createIngress(benchma
 		ClusterNamespace: clusterConfig.Namespace,
 		IngressDomain:    benchmarkConfig.IngressDomain,
 	}
-	err := k8s.ApplyManifest(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "ingressConfig", string(ingressConfig), data)
+	err := k8s.ApplyManifestFromString(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "ingressConfig", string(ingressConfig), data)
 	if err != nil {
 		log.Fatalf("Cluster %v; can't create Ingress. Error: %v", clusterConfig.Name, err)
 	}

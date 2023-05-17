@@ -136,7 +136,7 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 			data := struct{ Name string }{
 				Name: clusterConfig.Name,
 			}
-			err := k8s.ApplyManifest(k8s.RootCluster, kubeconfigPath, "configMap1mConfig", string(configMap1mConfig), data)
+			err := k8s.ApplyManifestFromString(k8s.RootCluster, kubeconfigPath, "configMap1mConfig", string(configMap1mConfig), data)
 			if err != nil {
 				log.Fatalf("Cluster %v; can't create ConfigMap. Error: %v", clusterConfig.Name, err)
 			}
