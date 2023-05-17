@@ -10,9 +10,13 @@ import (
 	"text/template"
 )
 
-const RootCluster = "root"
+const (
+	RootCluster  = "root"
+	MethodCreate = "create"
+	MethodApply  = "apply"
+)
 
-func ApplyManifestFromString(clusterName string, kubeconfigPath string, manifestName string, manifest string, data any) error {
+func ApplyManifestFromString(clusterName string, kubeconfigPath string, manifestName string, manifest string, data any, method string) error {
 	log.Debugf("Cluster %v; applying manifest: %s", clusterName, manifestName)
 
 	t, err := template.New(manifestName).Parse(manifest)
@@ -25,7 +29,7 @@ func ApplyManifestFromString(clusterName string, kubeconfigPath string, manifest
 		return err
 	}
 
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
+	cmd := exec.Command("kubectl", method, "-f", "-")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", kubeconfigPath))
 	cmd.Stdin = buffer
 	stdoutStderr, err := cmd.CombinedOutput()
@@ -38,7 +42,7 @@ func ApplyManifestFromString(clusterName string, kubeconfigPath string, manifest
 	return nil
 }
 
-func ApplyManifestFromEmbeddedFile(clusterName string, kubeconfigPath string, manifestFs fs.FS, manifestPath string, data any) error {
+func ApplyManifestFromEmbeddedFile(clusterName string, kubeconfigPath string, manifestFs fs.FS, manifestPath string, data any, method string) error {
 	log.Debugf("Cluster %v; applying manifest: %s", clusterName, manifestPath)
 
 	t, err := template.ParseFS(manifestFs, manifestPath)
@@ -51,7 +55,7 @@ func ApplyManifestFromEmbeddedFile(clusterName string, kubeconfigPath string, ma
 		return err
 	}
 
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
+	cmd := exec.Command("kubectl", method, "-f", "-")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", kubeconfigPath))
 	cmd.Stdin = buffer
 	stdoutStderr, err := cmd.CombinedOutput()

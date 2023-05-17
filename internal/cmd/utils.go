@@ -100,7 +100,7 @@ func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *
 	}
 	prometheusClient := prometheus.NewInClusterClient(benchmarkConfig.PrometheusConnType, k8sFrameworkForPrometheus.GetClients().GetClient())
 	prometheusQueryExecutor := measurement.NewPrometheusQueryExecutor(prometheusClient)
-	return err, prometheusQueryExecutor
+	return nil, prometheusQueryExecutor
 }
 
 func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
@@ -125,7 +125,6 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		kubeconfigPath := filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)
 		createNamespaceCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespace", "initial")
-		log.Info(fmt.Sprintf("--kubeconfig=%v", kubeconfigPath))
 
 		stdoutStderr, err := createNamespaceCmd.CombinedOutput()
 		if err != nil {
@@ -134,9 +133,9 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 
 		for i := 0; i < benchmarkConfig.InitialResources.ConfigMap; i++ {
 			data := struct{ Name string }{
-				Name: clusterConfig.Name,
+				Name: fmt.Sprintf("%v-%v", clusterConfig.Name, i),
 			}
-			err := k8s.ApplyManifestFromString(k8s.RootCluster, kubeconfigPath, "configMap1mConfig", string(configMap1mConfig), data)
+			err := k8s.ApplyManifestFromString(clusterConfig.Name, kubeconfigPath, "configMap1mConfig", string(configMap1mConfig), data, k8s.MethodCreate)
 			if err != nil {
 				log.Fatalf("Cluster %v; can't create ConfigMap. Error: %v", clusterConfig.Name, err)
 			}
@@ -198,6 +197,7 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, pr
 				log.Fatal(err)
 			}
 			cmd.Stdout = outfile
+			cmd.Stderr = outfile
 
 			err = cmd.Run()
 			if err != nil {

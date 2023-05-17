@@ -16,7 +16,6 @@ import (
 const (
 	rbacManifestsPattern                  = "kube-prometheus-configs/templates/rbac/*.yaml"
 	monitoringManifestsPattern            = "kube-prometheus-configs/templates/k8s/*.yaml"
-	numK8sClients                         = 1
 	checkPrometheusReadyIntervalInSeconds = 30
 	checkPrometheusReadyTimeoutInSeconds  = 300
 )
@@ -58,14 +57,14 @@ func (receiver PrometheusProvisioner) Provision(kubeconfigPath string, dto *Prov
 	}
 
 	for _, manifest := range rbacManifests {
-		err := k8s.ApplyManifestFromEmbeddedFile(k8s.RootCluster, kubeconfigPath, manifestsFs, manifest, dto)
+		err := k8s.ApplyManifestFromEmbeddedFile(k8s.RootCluster, kubeconfigPath, manifestsFs, manifest, dto, k8s.MethodApply)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, manifest := range monitoringManifests {
-		err := k8s.ApplyManifestFromEmbeddedFile(k8s.RootCluster, kubeconfigPath, manifestsFs, manifest, dto)
+		err := k8s.ApplyManifestFromEmbeddedFile(k8s.RootCluster, kubeconfigPath, manifestsFs, manifest, dto, k8s.MethodApply)
 		if err != nil {
 			return err
 		}

@@ -34,9 +34,9 @@ var (
 	vclusterValues []byte
 )
 
-func NewStandardVirtualClusterManager(prometheusQueryExecutor *measurement.PrometheusQueryExecutor) (*StandardVirtualClusterManager, error) {
+func NewStandardVirtualClusterManager(prometheusQueryExecutor *measurement.PrometheusQueryExecutor) *StandardVirtualClusterManager {
 	provisioner := monitoring.NewPrometheusProvisioner(prometheusQueryExecutor)
-	return &StandardVirtualClusterManager{PrometheusProvisioner: provisioner}, nil
+	return &StandardVirtualClusterManager{PrometheusProvisioner: provisioner}
 }
 
 func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfig *config.TestConfig) {
@@ -93,13 +93,21 @@ func (StandardVirtualClusterManager) Delete(benchmarkConfig *config.TestConfig) 
 		wg.Add(1)
 
 		go func() {
-			cmd := exec.Command("vcluster", "delete", clusterConfig.Name, "-n", clusterConfig.Namespace)
-			cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
-			stdoutStderr, err := cmd.CombinedOutput()
+			deleteClusterCmd := exec.Command("vcluster", "delete", clusterConfig.Name, "-n", clusterConfig.Namespace)
+			deleteClusterCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
+			stdoutStderr, err := deleteClusterCmd.CombinedOutput()
 			if err != nil {
-				log.Fatalf("Cluster %v; delete command error: %v, delete command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+				log.Fatalf("Cluster %v; error on deleting cluster: %v, result: %v", clusterConfig.Name, err, string(stdoutStderr))
 			}
-			log.Infof("Cluster %v; delete command result: %v", clusterConfig.Name, string(stdoutStderr))
+			log.Debugf("Cluster %v; deleted cluster, result: %v", clusterConfig.Name, string(stdoutStderr))
+
+			deleteNamespaceCmd := exec.Command("kubectl", "delete", "namespace", clusterConfig.Namespace)
+			deleteNamespaceCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
+			stdoutStderr, err = deleteNamespaceCmd.CombinedOutput()
+			if err != nil {
+				log.Fatalf("Cluster %v; error on deleting namespace for cluster: %v, result: %v", clusterConfig.Name, err, string(stdoutStderr))
+			}
+			log.Debugf("Cluster %v; deleted namespace for cluster, result: %v", clusterConfig.Name, string(stdoutStderr))
 
 			wg.Done()
 		}()
@@ -168,7 +176,7 @@ func (virtualClusterManager StandardVirtualClusterManager) createNamespace(bench
 	data := TemplateDto{
 		ClusterNamespace: clusterConfig.Namespace,
 	}
-	err := k8s.ApplyManifestFromString(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "namespaceConfig", string(namespaceConfig), data)
+	err := k8s.ApplyManifestFromString(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "namespaceConfig", string(namespaceConfig), data, k8s.MethodApply)
 	if err != nil {
 		log.Fatalf("Cluster %v; can't create Namespace. Error: %v", clusterConfig.Name, err)
 	}
@@ -180,7 +188,7 @@ func (virtualClusterManager StandardVirtualClusterManager) createIngress(benchma
 		ClusterNamespace: clusterConfig.Namespace,
 		IngressDomain:    benchmarkConfig.IngressDomain,
 	}
-	err := k8s.ApplyManifestFromString(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "ingressConfig", string(ingressConfig), data)
+	err := k8s.ApplyManifestFromString(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "ingressConfig", string(ingressConfig), data, k8s.MethodApply)
 	if err != nil {
 		log.Fatalf("Cluster %v; can't create Ingress. Error: %v", clusterConfig.Name, err)
 	}
