@@ -52,25 +52,25 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 				createCmdArgs := []string{"create", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--connect=false"}
 				createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
 				createCmd := exec.Command("vcluster", createCmdArgs...)
-				createCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.RootKubeConfigPath)))
+				createCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
 				stdoutStderr, err := createCmd.CombinedOutput()
 				if err != nil {
-					log.Fatal("Cluster %v; create command error: %e, create command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+					log.Fatalf("Cluster %v; create command error: %v, create command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 				}
 				log.Infof("Cluster %v; create command result: %v", clusterConfig.Name, string(stdoutStderr))
 
 				connectCmdArgs := []string{"connect", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath))}
 				connectCmd := exec.Command("vcluster", connectCmdArgs...)
-				connectCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.RootKubeConfigPath)))
+				connectCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
 				stdoutStderr, err = connectCmd.CombinedOutput()
 				if err != nil {
-					log.Fatal("Cluster %v; connect command error: %e, connect command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+					log.Fatalf("Cluster %v; connect command error: %v, connect command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 				}
 				log.Infof("Cluster %v; connect command result: %v", clusterConfig.Name, string(stdoutStderr))
 			}
 
 			if benchmarkConfig.ShouldProvisionMonitoring {
-				err := virtualClusterManager.PrometheusProvisioner.Provision(monitoring.NewProvisionerTemplateDto(clusterConfig.Name, clusterConfig.Namespace))
+				err := virtualClusterManager.PrometheusProvisioner.Provision(benchmarkConfig.RootKubeConfigPath, monitoring.NewProvisionerTemplateDto(clusterConfig.Name, clusterConfig.Namespace))
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -94,10 +94,10 @@ func (StandardVirtualClusterManager) Delete(benchmarkConfig *config.TestConfig) 
 
 		go func() {
 			cmd := exec.Command("vcluster", "delete", clusterConfig.Name, "-n", clusterConfig.Namespace)
-			cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.RootKubeConfigPath)))
+			cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
 			stdoutStderr, err := cmd.CombinedOutput()
 			if err != nil {
-				log.Fatal("Cluster %v; delete command error: %e, delete command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+				log.Fatalf("Cluster %v; delete command error: %v, delete command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 			}
 			log.Infof("Cluster %v; delete command result: %v", clusterConfig.Name, string(stdoutStderr))
 
@@ -111,7 +111,7 @@ func (StandardVirtualClusterManager) Delete(benchmarkConfig *config.TestConfig) 
 }
 
 func (virtualClusterManager StandardVirtualClusterManager) createWithIngressConnection(benchmarkConfig *config.TestConfig, clusterConfig *config.ClusterConfig) {
-	virtualClusterManager.createNamespace(clusterConfig)
+	virtualClusterManager.createNamespace(benchmarkConfig, clusterConfig)
 	virtualClusterManager.createIngress(benchmarkConfig, clusterConfig)
 
 	t, err := template.New("vclusterValues").Parse(string(vclusterValues))
@@ -131,6 +131,10 @@ func (virtualClusterManager StandardVirtualClusterManager) createWithIngressConn
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = valuesFile.Close()
+	if err != nil {
+		log.Error(err)
+	}
 	defer func() {
 		err = os.Remove(valuesFile.Name())
 		if err != nil {
@@ -142,31 +146,31 @@ func (virtualClusterManager StandardVirtualClusterManager) createWithIngressConn
 	createCmdArgs = append(createCmdArgs, "-f", valuesFile.Name())
 	createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
 	createCmd := exec.Command("vcluster", createCmdArgs...)
-	createCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.RootKubeConfigPath)))
+	createCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
 	stdoutStderr, err := createCmd.CombinedOutput()
 	if err != nil {
-		log.Fatal("Cluster %v; create command error: %e, create command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+		log.Fatalf("Cluster %v; create command error: %v, create command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 	}
 	log.Infof("Cluster %v; create command result: %v", clusterConfig.Name, string(stdoutStderr))
 
 	connectCmdArgs := []string{"connect", clusterConfig.Name, "-n", clusterConfig.Namespace, "--update-current=false", fmt.Sprintf("--kube-config=%v", filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath))}
 	connectCmdArgs = append(connectCmdArgs, fmt.Sprintf("--server=https://%s.%s", clusterConfig.Name, benchmarkConfig.IngressDomain))
 	connectCmd := exec.Command("vcluster", connectCmdArgs...)
-	connectCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", filepath.Join(benchmarkConfig.RootKubeConfigPath)))
+	connectCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
 	stdoutStderr, err = connectCmd.CombinedOutput()
 	if err != nil {
-		log.Fatal("Cluster %v; connect command error: %e, connect command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+		log.Fatalf("Cluster %v; connect command error: %v, connect command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 	}
 	log.Infof("Cluster %v; connect command result: %v", clusterConfig.Name, string(stdoutStderr))
 }
 
-func (virtualClusterManager StandardVirtualClusterManager) createNamespace(clusterConfig *config.ClusterConfig) {
+func (virtualClusterManager StandardVirtualClusterManager) createNamespace(benchmarkConfig *config.TestConfig, clusterConfig *config.ClusterConfig) {
 	data := TemplateDto{
 		ClusterNamespace: clusterConfig.Namespace,
 	}
-	err := k8s.ApplyManifest(clusterConfig, "namespaceConfig", string(namespaceConfig), data)
+	err := k8s.ApplyManifest(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "namespaceConfig", string(namespaceConfig), data)
 	if err != nil {
-		log.Fatal("Cluster %v; can't create Namespace. Error: %v", clusterConfig.Name, err)
+		log.Fatalf("Cluster %v; can't create Namespace. Error: %v", clusterConfig.Name, err)
 	}
 }
 
@@ -176,8 +180,8 @@ func (virtualClusterManager StandardVirtualClusterManager) createIngress(benchma
 		ClusterNamespace: clusterConfig.Namespace,
 		IngressDomain:    benchmarkConfig.IngressDomain,
 	}
-	err := k8s.ApplyManifest(clusterConfig, "ingressConfig", string(ingressConfig), data)
+	err := k8s.ApplyManifest(k8s.RootCluster, benchmarkConfig.RootKubeConfigPath, "ingressConfig", string(ingressConfig), data)
 	if err != nil {
-		log.Fatal("Cluster %v; can't create Ingress. Error: %v", clusterConfig.Name, err)
+		log.Fatalf("Cluster %v; can't create Ingress. Error: %v", clusterConfig.Name, err)
 	}
 }

@@ -96,7 +96,7 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []*config.TestConfig {
 func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *measurement.PrometheusQueryExecutor) {
 	k8sFrameworkForPrometheus, err := k8s.NewFramework(benchmarkConfig.RootKubeConfigPath, 1)
 	if err != nil {
-		log.Fatal("k8s framework creation error: %v", err)
+		log.Fatalf("k8s framework creation error: %v", err)
 	}
 	prometheusClient := prometheus.NewInClusterClient(benchmarkConfig.PrometheusConnType, k8sFrameworkForPrometheus.GetClients().GetClient())
 	prometheusQueryExecutor := measurement.NewPrometheusQueryExecutor(prometheusClient)
@@ -124,19 +124,21 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
 		kubeconfigPath := filepath.Join(benchmarkConfig.KubeconfigBasePath, clusterConfig.KubeConfigPath)
-		createNamespaceCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespaces", "initial")
+		createNamespaceCmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "create", "namespace", "initial")
+		log.Info(fmt.Sprintf("--kubeconfig=%v", kubeconfigPath))
+
 		stdoutStderr, err := createNamespaceCmd.CombinedOutput()
 		if err != nil {
-			log.Fatal("Cluster %v; error on creating namespace for initial resources: %e, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+			log.Fatalf("Cluster %v; error on creating namespace for initial resources: %v, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 		}
 
 		for i := 0; i < benchmarkConfig.InitialResources.ConfigMap; i++ {
 			data := struct{ Name string }{
 				Name: clusterConfig.Name,
 			}
-			err := k8s.ApplyManifest(&clusterConfig, "configMap1mConfig", string(configMap1mConfig), data)
+			err := k8s.ApplyManifest(k8s.RootCluster, kubeconfigPath, "configMap1mConfig", string(configMap1mConfig), data)
 			if err != nil {
-				log.Fatal("Cluster %v; can't create ConfigMap. Error: %v", clusterConfig.Name, err)
+				log.Fatalf("Cluster %v; can't create ConfigMap. Error: %v", clusterConfig.Name, err)
 			}
 		}
 	}
@@ -297,7 +299,7 @@ func cleanupInitialResources(benchmarkConfig *config.TestConfig) {
 		cmd := exec.Command("kubectl", fmt.Sprintf("--kubeconfig=%v", kubeconfigPath), "delete", "namespace", "initial")
 		stdoutStderr, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Fatal("Cluster %v; error on deleting initial resources: %e, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
+			log.Fatalf("Cluster %v; error on deleting initial resources: %v, command result: %v", clusterConfig.Name, err, string(stdoutStderr))
 		}
 	}
 

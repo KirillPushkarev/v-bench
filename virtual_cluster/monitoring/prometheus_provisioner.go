@@ -1,16 +1,15 @@
 package monitoring
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io/fs"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"os/exec"
-	"text/template"
 	"time"
 	"v-bench/internal/util"
+	"v-bench/k8s"
 	"v-bench/measurement"
 )
 
@@ -46,7 +45,7 @@ func NewPrometheusProvisioner(prometheusQueryExecutor *measurement.PrometheusQue
 	return &PrometheusProvisioner{prometheusQueryExecutor: prometheusQueryExecutor}
 }
 
-func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) error {
+func (receiver PrometheusProvisioner) Provision(kubeconfigPath string, dto *ProvisionerTemplateDto) error {
 	log.Infof("Cluster %v; applying prometheus manifests", dto.ClusterName)
 
 	rbacManifests, err := fs.Glob(manifestsFs, rbacManifestsPattern)
@@ -59,14 +58,14 @@ func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) err
 	}
 
 	for _, manifest := range rbacManifests {
-		err := receiver.applyManifest(dto, manifest)
+		err := k8s.ApplyManifest(k8s.RootCluster, kubeconfigPath, "rbac", manifest, dto)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, manifest := range monitoringManifests {
-		err := receiver.applyManifest(dto, manifest)
+		err := k8s.ApplyManifest(k8s.RootCluster, kubeconfigPath, "monitoring", manifest, dto)
 		if err != nil {
 			return err
 		}
@@ -83,31 +82,6 @@ func (receiver PrometheusProvisioner) Provision(dto *ProvisionerTemplateDto) err
 	}
 
 	log.Infof("Cluster %v; finished applying prometheus manifests", dto.ClusterName)
-
-	return nil
-}
-
-func (receiver PrometheusProvisioner) applyManifest(dto *ProvisionerTemplateDto, manifest string) error {
-	log.Debugf("Cluster %v; applying prometheus manifest: %s", dto.ClusterName, manifest)
-
-	t, err := template.ParseFS(manifestsFs, manifest)
-	if err != nil {
-		return err
-	}
-	buffer := new(bytes.Buffer)
-	err = t.Execute(buffer, dto)
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
-	cmd.Stdin = buffer
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("Cluster %v; finished applying prometheus manifest: %s", dto.ClusterName, manifest)
 
 	return nil
 }
