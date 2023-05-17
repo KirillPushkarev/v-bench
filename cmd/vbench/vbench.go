@@ -46,8 +46,8 @@ func init() {
 }
 
 func main() {
-	benchmarkConfigPath := flag.String("config", defaultConfigPath, "config file")
-	benchmarkOutputPath := flag.String("out", defaultOutputPath, "output path")
+	benchmarkConfigPath := flag.String("config", defaultConfigPath, "config file or directory with config files")
+	benchmarkOutputPath := flag.String("out", defaultOutputPath, "output directory")
 	flag.Var(&logflags, "log", "log `flags`, several allowed [debug,info,warn,error,fatal,color,nocolor,json]")
 	flag.Parse()
 	parseLogFlags()
@@ -57,6 +57,11 @@ func main() {
 	benchmarkConfigPaths := cmd.ReadBenchmarkConfigPaths(pathExpander.ExpandPath(*benchmarkConfigPath))
 	benchmarkConfigs := cmd.ParseBenchmarkConfigs(benchmarkConfigPaths)
 
+	experimentDirName, err := cmd.CreateExperimentDir(*benchmarkOutputPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for _, benchmarkConfig := range benchmarkConfigs {
 		err, prometheusQueryExecutor := cmd.CreatePrometheusQueryExecutor(benchmarkConfig)
 		if err != nil {
@@ -64,7 +69,7 @@ func main() {
 		}
 		vclusterManager := virtual_cluster.NewStandardVirtualClusterManager(prometheusQueryExecutor)
 
-		cmd.RunExperiment(vclusterManager, benchmarkConfig, pathExpander.ExpandPath(*benchmarkOutputPath), prometheusQueryExecutor)
+		cmd.RunExperiment(vclusterManager, benchmarkConfig, pathExpander.ExpandPath(*benchmarkOutputPath), experimentDirName, prometheusQueryExecutor)
 	}
 }
 

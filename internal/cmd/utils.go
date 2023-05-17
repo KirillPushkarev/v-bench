@@ -93,6 +93,24 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []*config.TestConfig {
 	return testConfigs
 }
 
+func CreateExperimentDir(benchmarkOutputPath string) (string, error) {
+	i := 1
+	currentDate := time.Now().Format("2006_01_02")
+	experimentDirName := fmt.Sprintf("%v_%03d", currentDate, i)
+	exists, _ := isFileOrDirExisting(filepath.Join(benchmarkOutputPath, experimentDirName))
+	for exists && i < maxExperimentsPerDay {
+		i++
+		experimentDirName = fmt.Sprintf("%v_%03d", currentDate, i)
+		exists, _ = isFileOrDirExisting(filepath.Join(benchmarkOutputPath, experimentDirName))
+	}
+
+	if i == maxExperimentsPerDay {
+		return "", errors.New("unable to find the next name for the experiment dir")
+	}
+
+	return experimentDirName, nil
+}
+
 func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *measurement.PrometheusQueryExecutor) {
 	k8sFrameworkForPrometheus, err := k8s.NewFramework(benchmarkConfig.RootKubeConfigPath, 1)
 	if err != nil {
@@ -103,13 +121,13 @@ func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *
 	return nil, prometheusQueryExecutor
 }
 
-func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
+func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string, experimentDirName string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
 	if benchmarkConfig.ClusterType == "virtual" {
 		vclusterManager.Create(benchmarkConfig)
 	}
 
 	createInitialResources(benchmarkConfig)
-	runTests(benchmarkConfig, benchmarkOutputPath, prometheusQueryExecutor)
+	runTests(benchmarkConfig, benchmarkOutputPath, experimentDirName, prometheusQueryExecutor)
 	cleanupInitialResources(benchmarkConfig)
 
 	if benchmarkConfig.ClusterType == "virtual" {
@@ -145,17 +163,13 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 	log.Info("Created initial resources.")
 }
 
-func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
-	experimentDirName, err := createExperimentDir(benchmarkOutputPath)
-	if err != nil {
-		log.Fatal(err)
-	}
+func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, experimentDirName string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
 	testOutputPath := filepath.Join(benchmarkOutputPath, experimentDirName, benchmarkConfig.Name)
 	if err := os.MkdirAll(testOutputPath, os.ModePerm); err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = copyFile(benchmarkConfig.ConfigPath, filepath.Join(testOutputPath, filepath.Base(benchmarkConfig.ConfigPath)))
+	_, err := copyFile(benchmarkConfig.ConfigPath, filepath.Join(testOutputPath, filepath.Base(benchmarkConfig.ConfigPath)))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -224,24 +238,6 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, pr
 	reporter.Report(benchmarkConfig, testOutputPath, hostMeasurementContext, virtualMeasurementContext)
 
 	log.Info("Finished running tests.")
-}
-
-func createExperimentDir(benchmarkOutputPath string) (string, error) {
-	i := 1
-	currentDate := time.Now().Format("2006_01_02")
-	experimentDirName := fmt.Sprintf("%v_%03d", currentDate, i)
-	exists, _ := isFileOrDirExisting(filepath.Join(benchmarkOutputPath, experimentDirName))
-	for exists && i < maxExperimentsPerDay {
-		i++
-		experimentDirName = fmt.Sprintf("%v_%03d", currentDate, i)
-		exists, _ = isFileOrDirExisting(filepath.Join(benchmarkOutputPath, experimentDirName))
-	}
-
-	if i == maxExperimentsPerDay {
-		return "", errors.New("unable to find the next name for the experiment dir")
-	}
-
-	return experimentDirName, nil
 }
 
 func isFileOrDirExisting(path string) (bool, error) {
