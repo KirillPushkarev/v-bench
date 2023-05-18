@@ -30,7 +30,7 @@ type Framework struct {
 }
 
 func NewFramework(kubeConfigPath string, clientsNumber int) (*Framework, error) {
-	log.Infof("Creating framework with %d clients and %q kubeconfig.", clientsNumber, kubeConfigPath)
+	log.Debugf("Creating framework with %d clients and %q kubeconfig.", clientsNumber, kubeConfigPath)
 	var err error
 	f := Framework{}
 	if f.clients, err = NewMultiClientSet(kubeConfigPath, clientsNumber); err != nil {

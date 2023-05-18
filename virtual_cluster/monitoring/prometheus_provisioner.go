@@ -44,7 +44,7 @@ func NewPrometheusProvisioner(prometheusQueryExecutor *measurement.PrometheusQue
 	return &PrometheusProvisioner{prometheusQueryExecutor: prometheusQueryExecutor}
 }
 
-func (receiver PrometheusProvisioner) Provision(kubeconfigPath string, dto *ProvisionerTemplateDto) error {
+func (provisioner PrometheusProvisioner) Provision(kubeconfigPath string, dto *ProvisionerTemplateDto) error {
 	log.Infof("Cluster %v; applying prometheus manifests", dto.ClusterName)
 
 	rbacManifests, err := fs.Glob(manifestsFs, rbacManifestsPattern)
@@ -70,12 +70,9 @@ func (receiver PrometheusProvisioner) Provision(kubeconfigPath string, dto *Prov
 		}
 	}
 
-	err = receiver.applyEtcdServicePatch(dto)
-	if err != nil {
-		return err
-	}
+	provisioner.applyEtcdServicePatch(dto)
 
-	err = receiver.waitForPrometheusToBeHealthy(dto)
+	err = provisioner.waitForPrometheusToBeHealthy(dto)
 	if err != nil {
 		return err
 	}
@@ -85,37 +82,35 @@ func (receiver PrometheusProvisioner) Provision(kubeconfigPath string, dto *Prov
 	return nil
 }
 
-func (receiver PrometheusProvisioner) applyEtcdServicePatch(dto *ProvisionerTemplateDto) error {
+func (provisioner PrometheusProvisioner) applyEtcdServicePatch(dto *ProvisionerTemplateDto) {
 	log.Debugf("Cluster %v; applying prometheus manifest: %s", dto.ClusterName, "kube-prometheus-configs/templates/k8s/patches/etcd-service-patch.yaml")
 
 	cmd := exec.Command("kubectl", "patch", "service", "-n", dto.ClusterNamespace, fmt.Sprintf("%v-etcd", dto.ClusterName), "--patch", string(etcdServicePatch))
-	_, err := cmd.CombinedOutput()
+	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		log.Fatalf("Cluster %v; error on applying manifest: %v, command result: %v", dto.ClusterName, err, string(stdoutStderr))
 	}
 
 	log.Debugf("Cluster %v; finished applying prometheus manifest: %s", dto.ClusterName, "kube-prometheus-configs/templates/k8s/patches/etcd-service-patch.yaml")
-
-	return nil
 }
 
-func (receiver PrometheusProvisioner) waitForPrometheusToBeHealthy(dto *ProvisionerTemplateDto) error {
+func (provisioner PrometheusProvisioner) waitForPrometheusToBeHealthy(dto *ProvisionerTemplateDto) error {
 	log.Infof("Cluster %v; waiting for Prometheus stack to become healthy...", dto.ClusterName)
 	return wait.PollImmediate(
 		checkPrometheusReadyIntervalInSeconds*time.Second,
 		checkPrometheusReadyTimeoutInSeconds*time.Second,
-		func() (bool, error) { return receiver.isPrometheusReady(dto) },
+		func() (bool, error) { return provisioner.isPrometheusReady(dto) },
 	)
 }
 
 // isPrometheusReady Checks that targets for control plane are ready.
-func (receiver PrometheusProvisioner) isPrometheusReady(dto *ProvisionerTemplateDto) (bool, error) {
+func (provisioner PrometheusProvisioner) isPrometheusReady(dto *ProvisionerTemplateDto) (bool, error) {
 	expectedScrapePools := []string{
 		fmt.Sprintf("serviceMonitor/%v/kube-apiserver/0", dto.ClusterNamespace),
 		fmt.Sprintf("serviceMonitor/%v/kube-controller-manager/0", dto.ClusterNamespace),
 		fmt.Sprintf("serviceMonitor/%v/etcd/0", dto.ClusterNamespace),
 	}
-	activeTargets, err := receiver.prometheusQueryExecutor.Targets("active")
+	activeTargets, err := provisioner.prometheusQueryExecutor.Targets("active")
 	if err != nil {
 		return false, err
 	}
