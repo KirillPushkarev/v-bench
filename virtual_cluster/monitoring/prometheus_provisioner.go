@@ -37,11 +37,11 @@ func NewProvisionerTemplateDto(clusterName string, clusterNamespace string) *Pro
 }
 
 type PrometheusProvisioner struct {
-	prometheusQueryExecutor *measurement.PrometheusQueryExecutor
+	queryExecutor measurement.QueryExecutor
 }
 
-func NewPrometheusProvisioner(prometheusQueryExecutor *measurement.PrometheusQueryExecutor) *PrometheusProvisioner {
-	return &PrometheusProvisioner{prometheusQueryExecutor: prometheusQueryExecutor}
+func NewPrometheusProvisioner(queryExecutor measurement.QueryExecutor) *PrometheusProvisioner {
+	return &PrometheusProvisioner{queryExecutor: queryExecutor}
 }
 
 func (provisioner PrometheusProvisioner) Provision(kubeconfigPath string, dto *ProvisionerTemplateDto) error {
@@ -110,7 +110,7 @@ func (provisioner PrometheusProvisioner) isPrometheusReady(dto *ProvisionerTempl
 		fmt.Sprintf("serviceMonitor/%v/kube-controller-manager/0", dto.ClusterNamespace),
 		fmt.Sprintf("serviceMonitor/%v/etcd/0", dto.ClusterNamespace),
 	}
-	activeTargets, err := provisioner.prometheusQueryExecutor.Targets("active")
+	activeTargets, err := provisioner.queryExecutor.Targets("active")
 	if err != nil {
 		return false, err
 	}

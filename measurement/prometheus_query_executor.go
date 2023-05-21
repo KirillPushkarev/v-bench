@@ -22,7 +22,7 @@ type PrometheusQueryExecutor struct {
 	client prometheus.Client
 }
 
-func NewPrometheusQueryExecutor(pc prometheus.Client) *PrometheusQueryExecutor {
+func NewPrometheusQueryExecutor(pc prometheus.Client) QueryExecutor {
 	return &PrometheusQueryExecutor{client: pc}
 }
 

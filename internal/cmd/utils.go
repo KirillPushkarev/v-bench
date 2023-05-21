@@ -93,6 +93,33 @@ func ParseBenchmarkConfigs(benchmarkConfigPaths []string) []*config.TestConfig {
 	return testConfigs
 }
 
+func ParseLifecycleBenchmarkConfigs(benchmarkConfigPaths []string) []*config.LifecycleTestConfig {
+	var testConfigs []*config.LifecycleTestConfig
+
+	for _, benchmarkConfigPath := range benchmarkConfigPaths {
+		configFile, err := os.OpenFile(benchmarkConfigPath, os.O_RDWR, 0666)
+		if err != nil {
+			log.Fatalf("Can not open benchmark config file %v, benchmark exited. \n", benchmarkConfigPath)
+		}
+
+		decoder := json.NewDecoder(configFile)
+		testConfig := config.NewDefaultLifecycleTestConfig(benchmarkConfigPath, &util.StandardPathExpander{})
+		err = decoder.Decode(&testConfig)
+		if err != nil {
+			log.Fatalf("Can not parse benchmark config file, error: \n %v \n", err)
+		}
+
+		testConfigs = append(testConfigs, testConfig)
+
+		err = configFile.Close()
+		if err != nil {
+			log.Fatalf("Can not close benchmark config file, error: \n %v \n", err)
+		}
+	}
+
+	return testConfigs
+}
+
 func CreateExperimentDir(benchmarkOutputPath string) (string, error) {
 	i := 1
 	currentDate := time.Now().Format("2006_01_02")
@@ -111,7 +138,7 @@ func CreateExperimentDir(benchmarkOutputPath string) (string, error) {
 	return experimentDirName, nil
 }
 
-func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *measurement.PrometheusQueryExecutor) {
+func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, measurement.QueryExecutor) {
 	k8sFrameworkForPrometheus, err := k8s.NewFramework(benchmarkConfig.RootKubeConfigPath, 1)
 	if err != nil {
 		log.Fatalf("k8s framework creation error: %v", err)
@@ -121,13 +148,13 @@ func CreatePrometheusQueryExecutor(benchmarkConfig *config.TestConfig) (error, *
 	return nil, prometheusQueryExecutor
 }
 
-func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string, experimentDirName string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
+func RunExperiment(vclusterManager virtual_cluster.VirtualClusterManager, benchmarkConfig *config.TestConfig, benchmarkOutputPath string, experimentDirName string, queryExecutor measurement.QueryExecutor) {
 	if benchmarkConfig.ClusterType == "virtual" {
 		vclusterManager.Create(benchmarkConfig)
 	}
 
 	createInitialResources(benchmarkConfig)
-	runTests(benchmarkConfig, benchmarkOutputPath, experimentDirName, prometheusQueryExecutor)
+	runTests(benchmarkConfig, benchmarkOutputPath, experimentDirName, queryExecutor)
 	cleanupInitialResources(benchmarkConfig)
 
 	if benchmarkConfig.ClusterType == "virtual" {
@@ -163,17 +190,17 @@ func createInitialResources(benchmarkConfig *config.TestConfig) {
 	log.Info("Created initial resources.")
 }
 
-func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, experimentDirName string, prometheusQueryExecutor *measurement.PrometheusQueryExecutor) {
+func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, experimentDirName string, queryExecutor measurement.QueryExecutor) {
 	testOutputPath := filepath.Join(benchmarkOutputPath, experimentDirName, benchmarkConfig.Name)
 	if err := os.MkdirAll(testOutputPath, os.ModePerm); err != nil {
 		log.Fatal(err)
 	}
 
-	_, err := copyFile(benchmarkConfig.ConfigPath, filepath.Join(testOutputPath, filepath.Base(benchmarkConfig.ConfigPath)))
+	_, err := CopyFile(benchmarkConfig.ConfigPath, filepath.Join(testOutputPath, filepath.Base(benchmarkConfig.ConfigPath)))
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = copyFile(benchmarkConfig.MetaInfoPath, filepath.Join(benchmarkOutputPath, experimentDirName, metaInfoFileName))
+	_, err = CopyFile(benchmarkConfig.MetaInfoPath, filepath.Join(benchmarkOutputPath, experimentDirName, metaInfoFileName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,7 +219,7 @@ func runTests(benchmarkConfig *config.TestConfig, benchmarkOutputPath string, ex
 	virtualClusterNames := util.Filter(clusterNames, func(clusterName string) bool { return clusterName != "host" })
 	hostMeasurementContext := measurement.NewContext(hostClusterNames, startTime)
 	virtualMeasurementContext := measurement.NewContext(virtualClusterNames, startTime)
-	metricCollector := measurement.NewMetricCollector(prometheusQueryExecutor)
+	metricCollector := measurement.NewMetricCollector(queryExecutor)
 
 	var wg sync.WaitGroup
 	for _, clusterConfig := range benchmarkConfig.ClusterConfigs {
@@ -252,7 +279,7 @@ func isFileOrDirExisting(path string) (bool, error) {
 	return false, err
 }
 
-func copyFile(sourcePath, destinationPath string) (bytesWritten int64, err error) {
+func CopyFile(sourcePath, destinationPath string) (bytesWritten int64, err error) {
 	sourceFileStat, err := os.Stat(sourcePath)
 	if err != nil {
 		return 0, err
