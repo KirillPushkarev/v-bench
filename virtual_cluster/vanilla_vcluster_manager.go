@@ -10,6 +10,7 @@ import (
 	"sync"
 	"text/template"
 	"v-bench/config"
+	"v-bench/internal/util"
 	"v-bench/k8s"
 	"v-bench/measurement"
 	"v-bench/virtual_cluster/monitoring"
@@ -31,7 +32,7 @@ var (
 	//go:embed templates/ingress/ingress.yaml
 	ingressConfig []byte
 	//go:embed templates/ingress/values.yaml
-	vclusterValues []byte
+	vclusterValuesConfig []byte
 )
 
 func NewStandardVirtualClusterManager(queryExecutor measurement.QueryExecutor) *StandardVirtualClusterManager {
@@ -46,8 +47,34 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 		wg.Add(1)
 
 		go func() {
+			indexOfValuesFlag := util.IndexOf(benchmarkConfig.ClusterCreateOptions, "-f")
+			if indexOfValuesFlag != -1 {
+				if indexOfValuesFlag >= len(benchmarkConfig.ClusterCreateOptions)-1 {
+					log.Fatal("Illegal cluster create options")
+				}
+
+				valuesInputPath := benchmarkConfig.ClusterCreateOptions[indexOfValuesFlag+1]
+				t, err := template.New("vclusterValuesConfig").ParseFiles(valuesInputPath)
+				if err != nil {
+					log.Fatal(err)
+				}
+				data := TemplateDto{
+					ClusterName:      clusterConfig.Name,
+					ClusterNamespace: clusterConfig.Namespace,
+					IngressDomain:    benchmarkConfig.IngressDomain,
+				}
+				valuesOutputFile, err := virtualClusterManager.executeTemplateToTempFile(t, data)
+				defer func() {
+					err = os.Remove(valuesOutputFile.Name())
+					if err != nil {
+						log.Error("Can't remove temp file: %s", err)
+					}
+				}()
+				benchmarkConfig.ClusterCreateOptions[indexOfValuesFlag+1] = valuesOutputFile.Name()
+			}
+
 			if benchmarkConfig.VirtualClusterConnType == config.VirtualClusterConnTypeIngress {
-				virtualClusterManager.createWithIngressConnection(benchmarkConfig, &clusterConfig, true)
+				virtualClusterManager.createWithIngressConnection(benchmarkConfig, &clusterConfig, true, indexOfValuesFlag != -1)
 			} else {
 				createCmdArgs := []string{"create", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--connect=false"}
 				createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
@@ -85,9 +112,25 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 	log.Info("Created virtual clusters.")
 }
 
+func (virtualClusterManager StandardVirtualClusterManager) executeTemplateToTempFile(t *template.Template, data TemplateDto) (*os.File, error) {
+	valuesOutputFile, err := os.CreateTemp("", "vcluster-values-*.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = t.Execute(valuesOutputFile, data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = valuesOutputFile.Close()
+	if err != nil {
+		log.Error(err)
+	}
+	return valuesOutputFile, err
+}
+
 func (virtualClusterManager StandardVirtualClusterManager) CreateSingle(benchmarkConfig *config.TestConfig, clusterConfig *config.ClusterConfig, shouldConnect bool) {
 	if benchmarkConfig.VirtualClusterConnType == config.VirtualClusterConnTypeIngress {
-		virtualClusterManager.createWithIngressConnection(benchmarkConfig, clusterConfig, shouldConnect)
+		virtualClusterManager.createWithIngressConnection(benchmarkConfig, clusterConfig, shouldConnect, false)
 	} else {
 		createCmdArgs := []string{"create", clusterConfig.Name, "--namespace", clusterConfig.Namespace, "--connect=false"}
 		createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
@@ -170,40 +213,39 @@ func (StandardVirtualClusterManager) DeleteSingle(benchmarkConfig *config.TestCo
 	log.Debugf("Cluster %v; deleted namespace for cluster, result: %v", clusterConfig.Name, string(stdoutStderr))
 }
 
-func (virtualClusterManager StandardVirtualClusterManager) createWithIngressConnection(benchmarkConfig *config.TestConfig, clusterConfig *config.ClusterConfig, shouldConnect bool) {
+func (virtualClusterManager StandardVirtualClusterManager) createWithIngressConnection(benchmarkConfig *config.TestConfig, clusterConfig *config.ClusterConfig, shouldConnect bool, isCustomValues bool) {
 	virtualClusterManager.createNamespace(benchmarkConfig, clusterConfig)
 	virtualClusterManager.createIngress(benchmarkConfig, clusterConfig)
 
-	t, err := template.New("vclusterValues").Parse(string(vclusterValues))
-	if err != nil {
-		log.Fatal(err)
-	}
-	data := TemplateDto{
-		ClusterName:      clusterConfig.Name,
-		ClusterNamespace: clusterConfig.Namespace,
-		IngressDomain:    benchmarkConfig.IngressDomain,
-	}
-	valuesFile, err := os.CreateTemp("", "vcluster-values-*.yaml")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(valuesFile, data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = valuesFile.Close()
-	if err != nil {
-		log.Error(err)
-	}
-	defer func() {
-		err = os.Remove(valuesFile.Name())
+	var (
+		t                *template.Template
+		valuesOutputFile *os.File
+		err              error
+	)
+
+	if !isCustomValues {
+		t, err = template.New("vclusterValuesConfig").Parse(string(vclusterValuesConfig))
 		if err != nil {
-			log.Error("Can't remove temp file: %s", err)
+			log.Fatal(err)
 		}
-	}()
+		data := TemplateDto{
+			ClusterName:      clusterConfig.Name,
+			ClusterNamespace: clusterConfig.Namespace,
+			IngressDomain:    benchmarkConfig.IngressDomain,
+		}
+		valuesOutputFile, err = virtualClusterManager.executeTemplateToTempFile(t, data)
+		defer func() {
+			err = os.Remove(valuesOutputFile.Name())
+			if err != nil {
+				log.Error("Can't remove temp file: %s", err)
+			}
+		}()
+	}
 
 	createCmdArgs := []string{"create", clusterConfig.Name, "-n", clusterConfig.Namespace, "--connect=false"}
-	createCmdArgs = append(createCmdArgs, "-f", valuesFile.Name())
+	if !isCustomValues {
+		createCmdArgs = append(createCmdArgs, "-f", valuesOutputFile.Name())
+	}
 	createCmdArgs = append(createCmdArgs, benchmarkConfig.ClusterCreateOptions...)
 	createCmd := exec.Command("vcluster", createCmdArgs...)
 	createCmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%v", benchmarkConfig.RootKubeConfigPath))
