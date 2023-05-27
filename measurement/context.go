@@ -48,6 +48,7 @@ type EtcdMetrics struct {
 		Failed    float64 `json:"failed"`
 	} `json:"consensus_proposals"`
 	DbSize                    metric.Statistics[float64]  `json:"db_size"`
+	DbSizeUsed                metric.Statistics[float64]  `json:"db_size_used"`
 	WalSyncDuration           metric.Statistics[float64]  `json:"wal_sync_duration"`
 	BackendCommitSyncDuration metric.Statistics[float64]  `json:"backend_commit_sync_duration"`
 	ResourceUsageMetrics      metric.ResourceUsageMetrics `json:"resource_usage_metrics"`

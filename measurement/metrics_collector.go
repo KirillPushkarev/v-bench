@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	numK8sClients = 1
-
 	clusterLabelName = "cluster"
 
 	goProcessCpuQuery            = "quantile_over_time(%.2f, avg(rate(process_cpu_seconds_total{%v}[%v]))[%v:%v])"
@@ -52,6 +50,7 @@ const (
 
 	etcdLeaderElectionsQuery    = "max(increase(etcd_server_leader_changes_seen_total{%v}[%v]))"
 	etcdDbSizeQuery             = "max(quantile_over_time(%.2f, etcd_mvcc_db_total_size_in_bytes{%v}[%v]))"
+	etcdDbSizeUsedQuery         = "max(quantile_over_time(%.2f, etcd_mvcc_db_total_size_in_use_in_bytes {%v}[%v]))"
 	etcdWalSyncQuery            = "histogram_quantile(%.2f, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{%v}[%v])) by (le))"
 	etcdBackendCommitSyncQuery  = "histogram_quantile(%.2f, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{%v}[%v])) by (le))"
 	etcdProposalsCommittedQuery = "sum(rate(etcd_server_proposals_committed_total{%v}[%v]))"
@@ -419,6 +418,27 @@ func (mc *MetricCollector) collectEtcdMetrics(context *Context, filters MetricFi
 		log.Errorf("prometheus metrics parsing error: %v", err)
 	} else {
 		etcdMetrics.DbSize = *dbSizeStatistics
+	}
+
+	var dbSizeUsedSamples []*model.Sample
+	for _, q := range quantiles {
+		query := fmt.Sprintf(etcdDbSizeUsedQuery, q, filters.EtcdCommonFilters, durationInPromFormat)
+		samples, err := mc.queryExecutor.Query(query, endTime)
+		if err != nil {
+			logQueryExecutionError(err, query)
+			continue
+		}
+
+		for _, sample := range samples {
+			sample.Metric["quantile"] = model.LabelValue(fmt.Sprintf("%.2f", q))
+		}
+		dbSizeUsedSamples = append(dbSizeUsedSamples, samples...)
+	}
+	dbSizeUsedStatistics, err := metricStatisticsFromSamples[float64](dbSizeUsedSamples, memoryConverter)
+	if err != nil {
+		log.Errorf("prometheus metrics parsing error: %v", err)
+	} else {
+		etcdMetrics.DbSizeUsed = *dbSizeUsedStatistics
 	}
 
 	var walSyncSamples []*model.Sample
