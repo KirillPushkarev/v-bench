@@ -54,7 +54,7 @@ func (virtualClusterManager StandardVirtualClusterManager) Create(benchmarkConfi
 				}
 
 				valuesInputPath := benchmarkConfig.ClusterCreateOptions[indexOfValuesFlag+1]
-				t, err := template.New("vclusterValuesConfig").ParseFiles(valuesInputPath)
+				t, err := template.ParseFiles(valuesInputPath)
 				if err != nil {
 					log.Fatal(err)
 				}
